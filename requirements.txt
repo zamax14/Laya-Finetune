@@ -1,0 +1,8 @@
+# Entrenar y evaluar necesitan una GPU NVIDIA: torch con CUDA 13 (driver 580 o superior). Generar datos no usa torch.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.0+cu130
+laya==0.3.5
+pydantic>=2.7
+# Notebooks
+jupyterlab
+matplotlib

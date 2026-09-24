@@ -1,0 +1,13 @@
+.venv/
+.model-cache/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.log
+# El dataset sintético y las respuestas del profesor se generan con generar.py y entrenar.py.
+data/*.csv
+data/*.jsonl
+# Llaves locales
+HF_TOKEN
+openrouter
+OPENAI
