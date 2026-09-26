@@ -167,12 +167,14 @@ Train the ladder in order, each stage from the previous checkpoint:
 ## On a Slurm cluster
 
 [`slurm.sh`](slurm.sh) runs any mode as a job, from the repo folder. The first job creates `.venv` and installs the
-package. With `backend=ollama` it starts its own Ollama server on the node, pulls the model and stops it at the end.
+package; later ones reinstall only when `pyproject.toml` changes. Generation talks over HTTP to the node's
+`ollama serve` daemon, which manages its own GPU, so submit it with `--gres=none`. Without a daemon, the job starts
+its own server on the GPU it gets.
 
 ```bash
 sbatch slurm.sh test
-sbatch slurm.sh generate task=helpdesk backend=ollama llm=gpt-oss:120b n=216 context=all parallel=8
-sbatch slurm.sh generate task=helpdesk backend=ollama llm=gpt-oss:120b n=0 filler=300 context=all parallel=8
+sbatch --gres=none slurm.sh generate task=helpdesk llm=qwen3.8:latest n=216 context=all parallel=8
+sbatch --gres=none slurm.sh generate task=helpdesk llm=qwen3.8:latest n=0 filler=300 context=all parallel=8
 sbatch slurm.sh train task=helpdesk profile=full ctx=32k
 ```
 
