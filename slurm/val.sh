@@ -15,9 +15,12 @@ cd $HOME/Laya-Finetune
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+export CPATH=$PWD/.venv/python-headers/usr/include/python3.12:$PWD/.venv/python-headers/usr/include  # From train.sh.
 
 # Option 1: command line
 layaft val task=tool_routing model=multilingual
+layaft val task=tool_routing model=runs/tool_routing-1k
+layaft val task=tool_routing model=runs/tool_routing-8k ctx=8k
 layaft val task=tool_routing model=runs/tool_routing-32k ctx=32k
 
 # Option 2: Python script (same result)
