@@ -60,7 +60,7 @@ class ContextChecks(unittest.TestCase):
 
     def test_attention_choice(self):
         self.assertEqual(attention_for(1024), "sdpa")
-        self.assertIn(attention_for(32768), ("flex_attention", "flash_attention_2"))
+        self.assertIn(attention_for(32768), ("flex_attention", "flash_attention_2", "sdpa"))  # sdpa without Python.h.
 
 
 if __name__ == "__main__":

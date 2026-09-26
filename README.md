@@ -178,7 +178,8 @@ positions up to 8,192. The framework grows the context in three steps:
    cases stay in the mix, so short states are not forgotten. A tenth of the filler is held out for evaluation.
 
 Above 8k the encoder switches from `sdpa` to `flex_attention` (or `flash_attention_2` if installed): `sdpa` builds a
-dense mask for the sliding-window layers and ran out of memory at 16k even just to predict.
+dense mask for the sliding-window layers and ran out of memory at 16k on a 6 GB GPU. `flex_attention` is compiled by
+Triton, which needs the Python headers (`Python.h`); without them it stays on `sdpa`, which fits on large GPUs.
 
 | Stage | How | Inference measured on an RTX 4050 Laptop (6 GB), 3 questions |
 |---|---|---|

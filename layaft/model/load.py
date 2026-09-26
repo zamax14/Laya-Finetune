@@ -39,7 +39,7 @@ def load(model=config.DEFAULT_MODEL, device="cuda", ctx=None):
         agent = laya.load(str(path), device=device)
     if ctx:
         agent.cfg["max_len"] = ctx
-    # Above 8192 tokens sdpa builds a dense mask for the sliding-window layers and runs out of memory even to
-    # predict (16k asked for 36 GB); flex_attention keeps it linear (16k in 2.7 GB).
+    # Above 8192 tokens sdpa builds a dense mask for the sliding-window layers (on a 6 GB GPU 16k ran out of memory);
+    # flex_attention keeps it small (16k in 2.7 GB) where Triton can compile it.
     agent.model.encoder.set_attn_implementation(attention_for(agent.cfg["max_len"]))
     return agent
