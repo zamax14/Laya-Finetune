@@ -27,9 +27,6 @@ class FakeLLM:
                {"titulo": "Pista", "solicitante": "x", "area": "x", "descripcion": "Esto no es un fallo de red. " + WORDS}]
         return json.dumps({"items": good + bad}), 0.001
 
-    def unload(self):
-        pass
-
 
 class GenerateChecks(unittest.TestCase):
     def test_generates_balanced_rows_without_leaks_and_appends(self):

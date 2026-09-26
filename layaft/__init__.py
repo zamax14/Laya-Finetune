@@ -31,7 +31,7 @@ class LayaFT:
         self.model = str(model)
 
     def generate(self, task, backend="ollama", n=72, context=None, filler=0, llm=None, api_key=None, base_url=None,
-                 ollama_url="http://localhost:11434", parallel=None, only=None, seed=None):
+                 ollama_url=None, parallel=None, only=None, seed=None):
         """About `n` cases per context; `context="all"` walks the task's contexts file. `filler=N` also writes N
         neutral documents (spread over the contexts) for long-context training."""
         from layaft.backends import create_backend
@@ -40,14 +40,11 @@ class LayaFT:
         llm_ = create_backend(backend, llm, api_key, base_url, ollama_url, parallel)
         contexts = task.contexts() if context == "all" else [context or task.default_context]
         total, cost = 0, 0.0
-        try:
-            for i, ctx in enumerate(contexts, 1):
-                rows, spent = generate(task, llm_, n, ctx, seed=seed, only=only) if n else ([], 0.0)
-                docs, spent_filler = generate_filler(task, llm_, -(-filler // len(contexts)), ctx) if filler else ([], 0.0)
-                total, cost = total + len(rows), cost + spent + spent_filler
-                print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
-        finally:
-            llm_.unload()  # Frees Ollama's VRAM once, not per context: training usually comes next on the same GPU.
+        for i, ctx in enumerate(contexts, 1):
+            rows, spent = generate(task, llm_, n, ctx, seed=seed, only=only) if n else ([], 0.0)
+            docs, spent_filler = generate_filler(task, llm_, -(-filler // len(contexts)), ctx) if filler else ([], 0.0)
+            total, cost = total + len(rows), cost + spent + spent_filler
+            print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
         print(f"Total: {total} cases" + (f" for US${cost:.2f}" if cost else ""))
         return total
 

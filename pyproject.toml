@@ -14,6 +14,7 @@ dependencies = [
     "laya==0.3.5",
     "torch>=2.5",
     "transformers>=5",  # 4.x ignores YaRN: the context would not really grow past 8192.
+    "ollama>=0.6",
     "pydantic>=2.7",
     "pyyaml>=6",
 ]

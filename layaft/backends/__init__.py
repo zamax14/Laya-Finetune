@@ -23,7 +23,7 @@ PRESETS = {
 OLLAMA_MODEL = "gemma3:12b"
 
 
-def create_backend(name="ollama", model=None, api_key=None, base_url=None, ollama_url="http://localhost:11434",
+def create_backend(name="ollama", model=None, api_key=None, base_url=None, ollama_url=None,
                    parallel=None):
     if name == "ollama":
         llm = Ollama(model or OLLAMA_MODEL, ollama_url)

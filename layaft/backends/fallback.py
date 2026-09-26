@@ -26,7 +26,3 @@ class FallbackChain(LLM):
                     self.llms.pop(0)
                     print(f"{getattr(llm, 'provider', llm.model)} out of credit: continuing with {self.llms[0].model}", flush=True)
             return self.llms[0](prompt, schema)
-
-    def unload(self):
-        for llm in self.llms:
-            llm.unload()

@@ -1,20 +1,20 @@
-"""Local generation with Ollama: free, one GPU."""
+"""Generation with Ollama through its official client: a local server, or the shared daemon of a GPU node."""
+from ollama import Client
+
 from layaft.backends.base import LLM
-from layaft.http import post
 
 
 class Ollama(LLM):
     parallel = 2  # One GPU: more threads only queue.
 
-    def __init__(self, model="gemma3:12b", url="http://localhost:11434"):
-        self.model, self.url = model, url.rstrip("/")
+    def __init__(self, model="gemma3:12b", url=None):
+        """`url=None` reads OLLAMA_HOST, else localhost:11434. Models are never pulled here: the server is shared."""
+        self.model, self.client = model, Client(host=url, timeout=600)
+        available = sorted(m.model for m in self.client.list().models)
+        if model not in available:
+            raise ValueError(f"Ollama has no model {model!r}; available: {', '.join(available)}")
 
     def __call__(self, prompt, schema):
-        body = post(f"{self.url}/api/chat", {"model": self.model, "messages": [{"role": "user", "content": prompt}],
-                                              "format": schema, "stream": False, "think": False,
-                                              "options": {"temperature": 0.9}}, timeout=600)
-        return body["message"]["content"], 0.0
-
-    def unload(self):
-        """Frees the VRAM: training usually comes next on the same GPU."""
-        post(f"{self.url}/api/generate", {"model": self.model, "keep_alive": 0})
+        reply = self.client.chat(model=self.model, messages=[{"role": "user", "content": prompt}], format=schema,
+                                 think=False, options={"temperature": 0.9})
+        return reply.message.content, 0.0

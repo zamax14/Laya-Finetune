@@ -17,9 +17,6 @@ class Fake:
             raise RuntimeError(self.error)
         return '{"items": []}', 0.0
 
-    def unload(self):
-        pass
-
 
 class BackendChecks(unittest.TestCase):
     def test_custom_endpoint_gets_base_url_key_and_schema(self):
@@ -45,6 +42,20 @@ class BackendChecks(unittest.TestCase):
         with mock.patch.object(backends.config, "secret", return_value="key"):
             self.assertIsInstance(create_backend("openrouter"), FallbackChain)
             self.assertIsInstance(create_backend("openrouter", api_key="forced"), OpenAICompatible)
+
+    def test_ollama_uses_the_official_client_and_never_pulls(self):
+        with mock.patch("layaft.backends.ollama.Client") as client_cls:
+            client = client_cls.return_value
+            client.list.return_value.models = [mock.Mock(model="qwen3.8:latest")]
+            client.chat.return_value.message.content = '{"items": []}'
+            llm = create_backend("ollama", model="qwen3.8:latest", ollama_url="http://dgx:11434")
+            self.assertEqual(llm("hola", {"type": "object"}), ('{"items": []}', 0.0))
+            with self.assertRaises(ValueError):  # A missing model is an error, not a download on a shared server.
+                create_backend("ollama", model="gemma3:12b")
+        client_cls.assert_any_call(host="http://dgx:11434", timeout=600)
+        client.pull.assert_not_called()
+        self.assertEqual(client.chat.call_args.kwargs["format"], {"type": "object"})
+        self.assertFalse(client.chat.call_args.kwargs["think"])
 
     def test_fallback_switches_only_when_out_of_credit(self):
         chain = FallbackChain([Fake("HTTP 402: Insufficient credits"), Fake()])

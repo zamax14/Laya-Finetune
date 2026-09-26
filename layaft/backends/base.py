@@ -8,6 +8,3 @@ class LLM:
 
     def __call__(self, prompt, schema):
         raise NotImplementedError
-
-    def unload(self):
-        """Free what the backend holds once the run ends (Ollama's VRAM before training on the same GPU)."""
