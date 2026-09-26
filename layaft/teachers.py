@@ -74,6 +74,7 @@ TEACHERS = {"jev": JevTeacher, "none": NoTeacher}
 
 
 def create_teacher(name="jev"):
+    name = name or "none"  # The CLI reads `teacher=none` as None.
     if name not in TEACHERS:
         raise ValueError(f"Unknown teacher {name!r}: use {' or '.join(TEACHERS)}")
     return TEACHERS[name]()

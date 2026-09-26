@@ -24,6 +24,7 @@ class TeacherChecks(unittest.TestCase):
         self.assertEqual(answers["bloqueo"]["confidence"], 1.0)
         self.assertAlmostEqual(jev.cost, 0.042)
         self.assertEqual(teachers.create_teacher("none").label([{"id": "1"}], task, None), {})
+        self.assertIsInstance(teachers.create_teacher(None), teachers.NoTeacher)
         json.dumps(answers)  # Cached as JSONL.
 
 
