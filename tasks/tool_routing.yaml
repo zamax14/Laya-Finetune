@@ -1,0 +1,101 @@
+# Tool / MCP routing: decide which tools an agent needs before the LLM is called.
+# The agent sends the conversation and the latest message; Laya answers in one pass whether to use tools, ask the
+# user or answer directly, and which tools (several can be needed at once). A cheap, calibrated gate: the LLM only
+# gets the tools it needs, and low confidence can fall back to exposing every tool.
+
+name: tool_routing
+
+fields:
+  history: {min_words: 8}   # 1–4 earlier turns: they may carry what the message takes for granted ("send it to him").
+  message: {min_words: 2}   # What the person writes now: often short.
+
+state:
+  conversation: "{history}"
+  message: "{message}"
+
+questions:
+  action:
+    type: choice
+    name: Action
+    instructions: >-
+      What should the assistant do with the latest `message`, given the `conversation`?
+    review: {green: 80, yellow: 60}  # Below green, expose every tool to the LLM instead of trusting the routing.
+    options:
+      use_tools:
+        label: Usar herramientas
+        criteria: "use tools: needs live or external data, the user's calendar, mail or files, an internal database, or an action in a system"
+      ask_user:
+        label: Preguntar al usuario
+        criteria: "ask the user: something essential is missing or ambiguous (who, which file, which date) and the conversation does not say it"
+      answer_directly:
+        label: Responder directamente
+        criteria: "answer directly: greetings, thanks, rewriting, translating or summarizing text already in the conversation, stable general knowledge"
+  web_search:
+    type: noul
+    name: Web search
+    instructions: Does handling the `message` need a web search for current or public information (news, prices, weather, traffic, public websites)?
+    words: {true: sí, false: "no"}
+  calendar:
+    type: noul
+    name: Calendar
+    instructions: Does handling the `message` need the user's calendar (reading, creating, moving or cancelling events, checking availability)?
+    words: {true: sí, false: "no"}
+  email:
+    type: noul
+    name: Email
+    instructions: Does handling the `message` need the user's email (reading, searching, drafting or sending messages)?
+    words: {true: sí, false: "no"}
+  files:
+    type: noul
+    name: Files
+    instructions: Does handling the `message` need the user's files or documents (finding, reading, saving or editing them in a drive or folder)?
+    words: {true: sí, false: "no"}
+  database:
+    type: noul
+    name: Database
+    instructions: Does handling the `message` need a query to an internal database or system of record (sales, inventory, customers, tickets, metrics)?
+    words: {true: sí, false: "no"}
+
+exclude:
+  # Asking or answering directly uses no tool…
+  - {action: [ask_user, answer_directly], web_search: true}
+  - {action: [ask_user, answer_directly], calendar: true}
+  - {action: [ask_user, answer_directly], email: true}
+  - {action: [ask_user, answer_directly], files: true}
+  - {action: [ask_user, answer_directly], database: true}
+  # …and using tools uses at least one.
+  - {action: use_tools, web_search: false, calendar: false, email: false, files: false, database: false}
+
+generation:
+  text_field: message
+  per_call: 5
+  contexts: tool_routing_contexts.txt
+  default_context: asistente de IA de una empresa mediana en México, usado por su personal
+  prompt: |-
+    Escribe {n} conversaciones distintas entre una persona y el asistente de IA de su trabajo, en el idioma del contexto (español si no indica otro).
+    Contexto: {context}
+
+    En cada una, el último mensaje de la persona (`message`) debe llevar a estas respuestas, solo por lo que dice la conversación:
+    - ¿Qué debe hacer el asistente?: {action.label} ({action.criteria}).
+    - ¿Necesita búsqueda web?: {web_search.label}.
+    - ¿Necesita el calendario de la persona?: {calendar.label}.
+    - ¿Necesita su correo?: {email.label}.
+    - ¿Necesita sus archivos o documentos?: {files.label}.
+    - ¿Necesita consultar una base de datos o sistema interno?: {database.label}.
+
+    Reglas:
+    - `history`: de 1 a 4 turnos previos breves, con el formato «Usuario: …» y «Asistente: …» en líneas separadas. Pueden aportar datos que el mensaje final da por sabidos («mándaselo a él», «ese archivo»).
+    - `message`: lo que la persona escribe ahora, como escribe la gente real: a veces corto y con faltas, a veces largo y con detalles.
+    - Varía: a veces la persona pide la acción de forma explícita («mándale un correo a…») y a veces solo describe lo que quiere lograr y la herramienta se deduce («¿llego a tiempo a la reunión con Pedro si salgo a las 5?»).
+    - Si una herramienta es «no», el mensaje no debe necesitarla, aunque toque temas cercanos.
+    - Si hay que preguntar al usuario, que falte de verdad algo esencial en toda la conversación.
+    - Situaciones distintas de estas, que ya existen: {seen}.
+  filler_prompt: |-
+    Write {n} documents that could sit earlier in an AI assistant's context in this setting: {context}.
+    They are already handled: earlier conversations that ended, tool results (search snippets, calendar listings,
+    email threads, query tables), system notes. Each one of 300 to 600 words, in the language of the setting.
+    None of them may contain a pending request.
+
+data:
+  # Hand-written, never trained on. Training data and filler use the defaults: data/tool_routing*.jsonl.
+  test: tool_routing_test.jsonl

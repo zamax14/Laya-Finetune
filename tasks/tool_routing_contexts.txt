@@ -1,0 +1,16 @@
+asistente de IA de una cadena de tiendas en México, usado por gerentes de sucursal
+copiloto de un despacho contable en España, usado por contadores y auxiliares
+asistente interno de una startup de software en Argentina, usado por desarrolladores y producto
+asistente de un hospital privado en Colombia, usado por personal administrativo y de admisión
+asistente de ventas de una distribuidora en Chile, usado por ejecutivos de cuenta
+asistente de recursos humanos de una planta manufacturera en Monterrey
+asistente personal de la directora de una ONG en Perú
+asistente de operaciones de una empresa de logística en Guadalajara
+asistente de una universidad en Uruguay, usado por coordinadores académicos
+asistente de un banco en Ecuador, usado por analistas de riesgo
+asistente legal de un bufete en Madrid, usado por abogados y pasantes
+asistente de una agencia de marketing en Bogotá, usado por ejecutivos de cuentas
+AI assistant of a SaaS company in Texas, used by customer success managers (write in English)
+AI assistant of a consulting firm in London, used by analysts (write in English)
+asistente de una cadena hotelera en Cancún, usado por recepción y ventas
+asistente de un equipo de ingeniería de datos en una fintech de la Ciudad de México

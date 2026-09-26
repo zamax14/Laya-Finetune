@@ -75,6 +75,12 @@ class TaskChecks(unittest.TestCase):
                     TASK.read_cases(path)
             self.assertEqual(TASK.read_cases(Path(tmp) / "missing.jsonl"), [])
 
+    def test_tool_routing_task(self):
+        task = Task.load("tool_routing")
+        self.assertEqual(len(task.combos()), 33)  # 31 non-empty tool sets to use, plus asking and answering directly.
+        self.assertEqual(len(task.test_cases()), 26)
+        self.assertFalse([c for c in task.combos() if c["action"] != "use_tools" and any(v is True for v in c.values())])
+
     def test_readme_example_task_loads(self):
         readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
         task = Task(yaml.safe_load(re.search(r"```yaml\n(name: invoices.*?)```", readme, re.S).group(1)))
