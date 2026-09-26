@@ -41,5 +41,12 @@ def load(model=config.DEFAULT_MODEL, device="cuda", ctx=None):
         agent.cfg["max_len"] = ctx
     # Above 8192 tokens sdpa builds a dense mask for the sliding-window layers (on a 6 GB GPU 16k ran out of memory);
     # flex_attention keeps it small (16k in 2.7 GB) where Triton can compile it.
-    agent.model.encoder.set_attn_implementation(attention_for(agent.cfg["max_len"]))
+    attention = attention_for(agent.cfg["max_len"])
+    if attention == "flex_attention":
+        import torch._dynamo
+        # create_block_mask recompiles for every mask variant and shape. Past dynamo's limit (8) flex_attention ran
+        # uncompiled, materializing ctx² scores (45 GB at 32k): allow more, and fail loudly instead of degrading.
+        torch._dynamo.config.recompile_limit = 256
+        torch._dynamo.config.fail_on_recompile_limit_hit = True
+    agent.model.encoder.set_attn_implementation(attention)
     return agent
