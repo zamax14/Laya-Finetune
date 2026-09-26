@@ -81,6 +81,8 @@ confidence (`review`), per-option `signals`, `leak_phrases`, a custom `prompt` i
 Every mode is a CLI command and a method of `LayaFT`; `model=` picks the checkpoint (`multilingual` by default,
 `english`, a Hub repo or a local folder).
 
+Each mode has a runnable Python script in [`examples/`](examples) whose docstring shows the equivalent command.
+
 ```python
 from layaft import LayaFT
 
@@ -166,17 +168,18 @@ Train the ladder in order, each stage from the previous checkpoint:
 
 ## On a Slurm cluster
 
-[`slurm.sh`](slurm.sh) runs any mode as a job, from the repo folder. The first job creates `.venv` and installs the
-package; later ones reinstall only when `pyproject.toml` changes. Generation talks over HTTP to the node's
-`ollama serve` daemon, which manages its own GPU, so submit it with `--gres=none`. Without a daemon, the job starts
-its own server on the GPU it gets.
+[`slurm/`](slurm) has one job per mode (`generate.sh`, `train.sh`, `val.sh`). Each one creates the project's virtual
+environment, installs the package in it, and runs the mode: with the CLI, or with the matching Python script in
+[`examples/`](examples) (commented out, same result). Nothing is installed outside `.venv`.
 
 ```bash
-sbatch slurm.sh test
-sbatch --gres=none slurm.sh generate task=helpdesk llm=qwen3.8:latest n=216 context=all parallel=8
-sbatch --gres=none slurm.sh generate task=helpdesk llm=qwen3.8:latest n=0 filler=300 context=all parallel=8
-sbatch slurm.sh train task=helpdesk profile=full ctx=32k
+sbatch slurm/generate.sh   # no GPU from Slurm: it talks to the node's Ollama daemon
+sbatch slurm/train.sh
+sbatch slurm/val.sh
 ```
+
+Generation never pulls models into a shared Ollama server: if `llm=` is not there, it stops and lists the available
+ones.
 
 ## Case study: IT helpdesk triage
 
@@ -230,7 +233,8 @@ layaft/
   cli.py  __init__.py          `layaft <mode> key=value` and the LayaFT facade
 tasks/       helpdesk.yaml, its test set and contexts
 notebooks/   the three steps, explained
-slurm.sh     any mode as a Slurm job
+examples/    one Python script per mode, with its CLI equivalent
+slurm/       one Slurm job per mode
 ```
 
 ```bash
