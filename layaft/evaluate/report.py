@@ -10,9 +10,9 @@ def table(task, summaries):
     first = next(iter(summaries.values()))
     names = [name for qid, q in task.questions.items() for name, _ in q.display(first["questions"][qid])]
     values = {label: [v for qid, q in task.questions.items() for _, v in q.display(s["questions"][qid])]
-              + [f"{s['p50_latency_ms']:.0f} ms"] for label, s in summaries.items()}
+              + [f"{s['all_correct']}/{s['total']}", f"{s['p50_latency_ms']:.0f} ms"] for label, s in summaries.items()}
     lines = ["| | " + " | ".join(summaries) + " |", "|---|" + "---|" * len(summaries)]
-    lines += [f"| {name} | " + " | ".join(str(v[i]) for v in values.values()) + " |" for i, name in enumerate(names + ["Latency p50"])]
+    lines += [f"| {name} | " + " | ".join(str(v[i]) for v in values.values()) + " |" for i, name in enumerate(names + ["All answers right", "Latency p50"])]
     return "\n".join(lines)
 
 

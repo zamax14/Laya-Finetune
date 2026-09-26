@@ -41,11 +41,13 @@ class EvaluateChecks(unittest.TestCase):
         self.assertEqual(q["categoria"]["lights"]["green"]["correct"], 19)
         self.assertAlmostEqual(q["categoria"]["ece"], .05)  # Right every time with 95 % confidence.
         self.assertEqual(len(rows), 20)
+        self.assertEqual((s["all_correct"], s["total"]), (20, 20))  # The ticket without a category counts on the rest.
 
     def test_wrong_and_overconfident_scores_worse(self):
         cases = TASK.test_cases()
         s, _ = run.evaluate(FakeAgent(cases, right=False, confidence=.99), cases, TASK)
         self.assertEqual(s["questions"]["categoria"]["correct"], 0)
+        self.assertEqual(s["all_correct"], 0)
         self.assertGreater(s["questions"]["categoria"]["ece"], .9)
 
     def test_by_length_keeps_the_answers(self):
@@ -61,6 +63,7 @@ class EvaluateChecks(unittest.TestCase):
         text = report.table(TASK, {"a": s, "b": s})
         self.assertIn("| Category | 19/19 | 19/19 |", text)
         self.assertIn("| Priority ±1 |", text)
+        self.assertIn("| All answers right | 20/20 | 20/20 |", text)
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "c.svg"
             report.chart(TASK, {"a": s, "b": s}, path)

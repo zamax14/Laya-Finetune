@@ -23,7 +23,10 @@ def evaluate(agent, cases, task):
 
 def summarize(task, rows):
     latencies = sorted(r["latency_ms"] for r in rows)
+    # The whole decision right: every graded question of the case at once (for routing, the exact tool set).
+    whole = [all(a["predicted"] == a["expected"] for a in r["answers"].values() if a["expected"] is not None) for r in rows]
     return {"questions": {qid: q.metrics([r["answers"][qid] for r in rows]) for qid, q in task.questions.items()},
+            "all_correct": sum(whole), "total": len(rows),
             "p50_latency_ms": round(statistics.median(latencies), 1),
             "p95_latency_ms": latencies[min(len(latencies) - 1, round(.95 * (len(latencies) - 1)))]}
 
