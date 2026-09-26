@@ -94,6 +94,16 @@ class Task:
         all_ = [dict(zip(self.questions, values)) for values in itertools.product(*(q.keys for q in self.questions.values()))]
         return [c for c in all_ if not any(_matches(c, rule) for rule in rules)]
 
+    def weight(self, combo):
+        """How often the generator writes this combination, relative to the others: the product of the `weight` of
+        every `generation.weights` rule it matches (1 without rules), to follow the real mix of answers."""
+        weight = 1.0
+        for rule in self.spec.get("generation", {}).get("weights", []):
+            rule = dict(rule)
+            factor = rule.pop("weight")
+            weight *= factor if _matches(combo, rule) else 1.0
+        return weight
+
     # ------------------------------------------------------------------ cases
 
     def state(self, case):

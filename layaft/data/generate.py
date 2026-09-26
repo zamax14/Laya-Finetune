@@ -53,8 +53,10 @@ def prompt_for(task, combo, context, seen, rng, count):
     answers = "\n".join(f"- {task.questions[qid].instructions} → {d.label}" + (f" ({d.criteria})" if d.criteria else "")
                         + (f". The facts must show {d.signals}" if d.signals else "") for qid, d in values.items())
     choices = "".join(f" For {name}, one of: {s}." for name, s in samples.items())
+    # `generation.vary`: one option of each list per call, e.g. {length: ["short", "long"]} → {length} in the prompt.
+    picks = {name: rng.choice(options) for name, options in task.spec.get("generation", {}).get("vary", {}).items()}
     return (task.prompt or PROMPT).format(n=count, context=context, seen="; ".join(seen[-30:]) or "—", answers=answers,
-                                          fields=", ".join(task.fields), choices=choices, **values, **samples)
+                                          fields=", ".join(task.fields), choices=choices, **values, **samples, **picks)
 
 
 def parse(content, model):
@@ -63,7 +65,8 @@ def parse(content, model):
 
 
 def generate(task, llm, n, context=None, path=None, seed=None, only=None):
-    """About n new cases spread over the answer combinations, appended to the task's JSONL. Returns (rows, cost).
+    """About n new cases spread over the answer combinations by `task.weight`, appended to the task's JSONL.
+    Returns (rows, cost).
 
     `only` limits the combinations, e.g. {"categoria": ["seguridad"]} to reinforce one with few valid cases. Each
     combination is written as soon as it is done: if the run stops, what was generated stays.
@@ -72,12 +75,16 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
     taken = {norm(task.title(c)) for c in task.test_cases() + io.read(path)}
     seed = seed if seed is not None else time.time_ns()
     pool = [c for c in task.combos() if not only or all(c[q] in v for q, v in only.items())]
-    combos = random.Random(seed).sample(pool, min(n, len(pool)))  # With few rows, random combinations.
-    per_combo = -(-n // len(combos))
-    schema, written = task.schema.model_json_schema(), []
+    weights, rng = [task.weight(c) for c in pool], random.Random(seed)
+    # n shared by weight; the fraction is rounded at random, so rare combinations still appear now and then.
+    exact = [n * w / sum(weights) for w in weights]
+    counts = [(combo, int(e) + (rng.random() < e % 1)) for combo, e in zip(pool, exact)]
+    counts = [(combo, k) for combo, k in counts if k]
+    schema, written, planned = task.schema.model_json_schema(), [], sum(k for _, k in counts)
 
-    def one(combo):
+    def one(combo_count):
         # A combination's calls run in series so each sees the titles already used.
+        combo, per_combo = combo_count
         rng, rows, seen, cost = random.Random(f"{seed}-{combo}"), [], [], 0.0
         for _ in range(3 * -(-per_combo // task.per_call)):  # Room for the dropped ones.
             if len(rows) >= per_combo:
@@ -101,11 +108,11 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
                              "model": llm.model, "created": datetime.now(timezone.utc).isoformat(timespec="seconds")})
         io.append(path, rows[:per_combo])
         written.extend(rows[:per_combo])
-        print(f"{len(written)}/{len(combos) * per_combo} rows", flush=True)
+        print(f"{len(written)}/{planned} rows", flush=True)
         return cost
 
     with ThreadPoolExecutor(llm.parallel) as executor:
-        cost = sum(executor.map(one, combos))
+        cost = sum(executor.map(one, counts))
     return written, cost
 
 

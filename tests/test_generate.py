@@ -54,6 +54,21 @@ class GenerateChecks(unittest.TestCase):
         prompt = gen.prompt_for(TASK, combo, "banco", [], random.Random(0), 5)
         self.assertIn(TASK.questions["categoria"].options["seguridad"].signals, prompt)
 
+    def test_weights_follow_the_rules_and_vary_picks_an_option(self):
+        spec = {**TASK.spec, "generation": {**TASK.spec["generation"], "prompt": "{n} {tono}",
+                                            "weights": [{"categoria": "seguridad", "weight": 4},
+                                                        {"bloqueo": True, "weight": 0.5}],
+                                            "vary": {"tono": ["seco", "amable"]}}}
+        task = Task(spec, TASK.root)
+        self.assertEqual(task.weight({"categoria": "seguridad", "prioridad": "alta", "bloqueo": True}), 2.0)
+        self.assertEqual(task.weight({"categoria": "redes", "prioridad": "alta", "bloqueo": False}), 1.0)
+        prompts = {gen.prompt_for(task, {}, "banco", [], random.Random(i), 5) for i in range(20)}
+        self.assertEqual(prompts, {"5 seco", "5 amable"})
+        with tempfile.TemporaryDirectory() as tmp:
+            rows, _ = gen.generate(task, FakeLLM(), 200, "banco", Path(tmp) / "c.jsonl", seed=4)
+        share = sum(r["answers"]["categoria"] == "seguridad" for r in rows) / len(rows)
+        self.assertAlmostEqual(share, 4 / 9, delta=0.05)  # Weight 4 against 1 for each of the other 5 categories.
+
     def test_default_prompt_for_a_task_without_one(self):
         task = Task({**TASK.spec, "generation": {**TASK.spec["generation"], "prompt": None}})
         prompt = gen.prompt_for(task, {"categoria": "redes", "prioridad": "alta", "bloqueo": True}, "banco", [],
