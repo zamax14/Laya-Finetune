@@ -2,12 +2,16 @@
 .model-cache/
 __pycache__/
 *.pyc
+*.egg-info/
 .ipynb_checkpoints/
 *.log
-# El dataset sintético y las respuestas del profesor se generan con generar.py y entrenar.py.
+# Checkpoints and evaluations: `layaft train` / `layaft val` write them here.
+runs/
+# Generated cases, teacher answers and filler: `layaft generate` and `layaft train` write them.
 data/*.csv
 data/*.jsonl
-# Llaves locales
+# Local keys
 HF_TOKEN
 openrouter
 OPENAI
+typesafe

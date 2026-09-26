@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laya-finetune"
+version = "0.1.0"
+description = "Fine-tune Laya, the open System One decision model, for any typed-decision task: synthetic data, RLCD, calibration and long context."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+# torch with CUDA: pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130
+dependencies = [
+    "laya==0.3.5",
+    "torch>=2.5",
+    "transformers>=5",  # 4.x ignores YaRN: the context would not really grow past 8192.
+    "pydantic>=2.7",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+notebooks = ["jupyterlab", "matplotlib"]
+
+[project.scripts]
+layaft = "layaft.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["layaft*"]
