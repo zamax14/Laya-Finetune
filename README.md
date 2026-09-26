@@ -202,7 +202,7 @@ positions up to 8,192. The framework grows the context in three steps:
 Above 8k the encoder switches from `sdpa` to `flex_attention` (or `flash_attention_2` if installed): `sdpa` builds a
 dense mask for the sliding-window layers and ran out of memory at 16k on a 6 GB GPU. `flex_attention` is compiled by
 Triton, which needs the Python headers (`Python.h`, from Python's include directory or `CPATH`); without them it stays on
-`sdpa`. [`slurm/train.sh`](slurm/train.sh) unpacks them inside the venv on a node that lacks them.
+`sdpa`. [`slurm/train_32k.sh`](slurm/train_32k.sh) unpacks them inside the venv on a node that lacks them.
 
 | Stage | How | Inference measured on an RTX 4050 Laptop (6 GB), 3 questions |
 |---|---|---|
@@ -217,15 +217,23 @@ Train the ladder in order, each stage from the previous checkpoint:
 
 ## On a Slurm cluster
 
-[`slurm/`](slurm) has one job per mode (`generate.sh`, `verify.sh`, `train.sh`, `val.sh`). Each one creates the project's virtual
-environment, installs the package in it, and runs the mode: with the CLI, or with the matching Python script in
-[`examples/`](examples) (commented out, same result). Nothing is installed outside `.venv`.
+[`slurm/`](slurm) has one job per step, and each training stage is its own job that also evaluates its checkpoint.
+Every job creates the project's virtual environment, installs the package in it, and runs the step, with the CLI or
+the same calls from Python (commented out, same result). Nothing is installed outside `.venv`.
+
+| Job | Step | GPU |
+|---|---|---|
+| `generate.sh` | cases and filler from the node's Ollama daemon | none from Slurm (the daemon has its own) |
+| `verify.sh` | two judges, then `data/<task>_train.jsonl` | none from Slurm |
+| `train_1k.sh`, `train_8k.sh`, `train_32k.sh` | one context stage from the previous one, plus its `val` | 1 |
+| `val.sh` | Laya as shipped, the reference | 1 |
+
+[`slurm/pipeline.sh`](slurm/pipeline.sh) queues them all at once with `--dependency=afterok`: each job starts when
+the one it needs has finished well, and independent ones run at the same time on other GPUs. Every step keeps its own
+log, and a failed stage stops the ones after it. Run it on the login node:
 
 ```bash
-sbatch slurm/generate.sh   # no GPU from Slurm: it talks to the node's Ollama daemon
-sbatch slurm/verify.sh     # same daemon, another model
-sbatch slurm/train.sh
-sbatch slurm/val.sh
+bash slurm/pipeline.sh     # or one step: sbatch --dependency=afterok:<job> slurm/train_8k.sh
 ```
 
 Generation never pulls models into a shared Ollama server: if `llm=` is not there, it stops and lists the available

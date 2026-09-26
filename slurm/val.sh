@@ -15,15 +15,13 @@ cd $HOME/Laya-Finetune
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-export CPATH=$PWD/.venv/python-headers/usr/include/python3.12:$PWD/.venv/python-headers/usr/include  # From train.sh.
 
 # Option 1: command line
+# Laya as shipped, the reference every stage is compared with (each train_*.sh evaluates its own checkpoint).
 layaft val task=tool_routing model=multilingual
-layaft val task=tool_routing model=runs/tool_routing-1k
-layaft val task=tool_routing model=runs/tool_routing-8k ctx=8k
-layaft val task=tool_routing model=runs/tool_routing-32k ctx=32k
 
-# Option 2: Python script (same result)
-# python examples/val.py
+# Option 2: the same from Python
+# python -c 'from layaft import LayaFT; LayaFT("multilingual").val(task="tool_routing")'
+
 
 pwd; hostname; date
