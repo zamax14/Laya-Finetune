@@ -18,6 +18,7 @@ in a YAML file, then `generate`, `train` and `val` from one command or one funct
 
 ```bash
 layaft generate task=helpdesk backend=ollama n=216 context=all     # cases labelled by construction
+layaft verify task=helpdesk llm=gemma4:31b                         # a second LLM drops the mislabelled ones
 layaft train task=helpdesk profile=full ctx=16k                    # RLCD + calibration → runs/helpdesk-16k
 layaft val task=helpdesk model=runs/helpdesk-16k ctx=16k           # hand-written test set, by length
 ```
@@ -56,7 +57,7 @@ Generating data needs no GPU. Training and evaluation need an NVIDIA GPU; the `t
 
 ```yaml
 name: invoices
-fields: {vendor: {}, body: {min_words: 40}}          # what the generator asks the LLM to write
+fields: {vendor: {}, body: {min_words: 40}}          # what the generator asks the LLM to write ({required: false} may be empty)
 state: {invoice: "{vendor}: {body}"}                  # what Laya reads
 questions:
   expense_type:
@@ -73,8 +74,12 @@ generation: {text_field: body, default_context: supplier invoices of a mid-size 
 data: {test: invoices_test.jsonl}                     # hand-written cases, never trained on (format below)
 ```
 
-The full example with every option is [`tasks/helpdesk.yaml`](tasks/helpdesk.yaml). It covers the traffic light on
-confidence (`review`), per-option `signals`, `leak_phrases`, a custom `prompt` in Spanish and a contexts file.
+The full examples are [`tasks/helpdesk.yaml`](tasks/helpdesk.yaml) and [`tasks/tool_routing.yaml`](tasks/tool_routing.yaml).
+They cover:
+- the traffic light on confidence (`review`), per-option `signals` and `leak_phrases`;
+- a custom `prompt` in Spanish and a contexts file;
+- `weights`, which follow the real mix of answers instead of one case per combination;
+- `vary`, which draws a random hint per call (length, style, turns) so the texts do not all sound alike.
 
 ## Dataset format
 
@@ -113,6 +118,7 @@ from layaft import LayaFT
 
 m = LayaFT("multilingual")
 m.generate(task="helpdesk", backend="openrouter", n=216, context="all")
+m.verify(task="helpdesk", llm="gemma4:31b")             # → data/helpdesk_verified.jsonl
 m.train(task="helpdesk", profile="full", ctx="32k")     # m.model is now runs/helpdesk-32k
 m.val(task="helpdesk", ctx="32k")
 m.predict({"ticket": "La VPN se cae cada hora desde ayer"}, task="helpdesk")
@@ -121,14 +127,16 @@ m.predict({"ticket": "La VPN se cae cada hora desde ayer"}, task="helpdesk")
 | Mode | What it does | Main arguments |
 |---|---|---|
 | `generate` | Writes cases labelled by construction to `data/<task>.jsonl`; `filler=` also writes the neutral documents for long context | `backend`, `llm`, `n`, `context` (`all` = the task's file), `filler`, `api_key`, `base_url`, `parallel`, `only` |
+| `verify` | A second LLM answers every case blind: agreements to `<data>_verified.jsonl`, the rest to `<data>_rejected.jsonl` | `llm`, `backend`, `data`, `parallel` |
 | `train` | Teacher, split, RLCD, calibration, comparison, checkpoint in Laya's format under `runs/` | `profile` (`test`/`full`), `ctx`, `epochs`, `teacher` (`jev`/`none`), `long`, `gpu_limit` |
-| `val` | Test-set metrics, table and chart in `runs/val/<task>-<model>/`; with `ctx`, also by length | `ctx` |
+| `val` | Test-set metrics (per question, and every question right at once), table and chart in `runs/val/<task>-<model>/`; with `ctx`, also by length | `ctx` |
 | `predict` | Typed answers for one state | `state`, `ctx` |
 | `extend` | Copies a checkpoint with room for `ctx` tokens (no training) | `ctx`, `out` |
 
 ### Data: any LLM
 
-The answers are decided first, and an LLM writes a text that has them: one combination per call, spread evenly. Texts
+The answers are decided first, and an LLM writes a text that has them: one combination per call, spread by the
+task's `weights` (evenly without them). Texts
 that name the answer, use a `leak_phrase` or repeat a title (from the data or the test set) are dropped. The task's
 fields become a Pydantic model whose JSON Schema constrains the LLM and validates every batch.
 
@@ -140,6 +148,14 @@ fields become a Pydantic model whose JSON Schema constrains the LLM and validate
 | `custom` | any OpenAI-compatible server (vLLM, LM Studio, Groq…): `base_url=`, `llm=` | `api_key=` if it needs one |
 
 `api_key=` always wins over the environment and the files, which are git-ignored.
+
+### Judge
+
+A label by construction is only as good as the generator's obedience: asked for a message that needs the email, it
+sometimes writes one that does not. `verify` gives every case to an LLM of another family, which reads only the state
+Laya will read and answers the same questions. Cases where it agrees on every question go to `<data>_verified.jsonl`.
+The rest go to `<data>_rejected.jsonl` with its answers, for auditing. Cases already judged are skipped, so it can run
+after every generation round. Train with `data=data/<task>_verified.jsonl`.
 
 ### Teacher
 
@@ -179,7 +195,8 @@ positions up to 8,192. The framework grows the context in three steps:
 
 Above 8k the encoder switches from `sdpa` to `flex_attention` (or `flash_attention_2` if installed): `sdpa` builds a
 dense mask for the sliding-window layers and ran out of memory at 16k on a 6 GB GPU. `flex_attention` is compiled by
-Triton, which needs the Python headers (`Python.h`); without them it stays on `sdpa`, which fits on large GPUs.
+Triton, which needs the Python headers (`Python.h`, from Python's include directory or `CPATH`); without them it stays on
+`sdpa`. [`slurm/train.sh`](slurm/train.sh) unpacks them inside the venv on a node that lacks them.
 
 | Stage | How | Inference measured on an RTX 4050 Laptop (6 GB), 3 questions |
 |---|---|---|
@@ -194,12 +211,13 @@ Train the ladder in order, each stage from the previous checkpoint:
 
 ## On a Slurm cluster
 
-[`slurm/`](slurm) has one job per mode (`generate.sh`, `train.sh`, `val.sh`). Each one creates the project's virtual
+[`slurm/`](slurm) has one job per mode (`generate.sh`, `verify.sh`, `train.sh`, `val.sh`). Each one creates the project's virtual
 environment, installs the package in it, and runs the mode: with the CLI, or with the matching Python script in
 [`examples/`](examples) (commented out, same result). Nothing is installed outside `.venv`.
 
 ```bash
 sbatch slurm/generate.sh   # no GPU from Slurm: it talks to the node's Ollama daemon
+sbatch slurm/verify.sh     # same daemon, another model
 sbatch slurm/train.sh
 sbatch slurm/val.sh
 ```
@@ -252,12 +270,12 @@ RTX 4070 Ti SUPER.
 layaft/
   task.py  questions.py        the task (YAML) and the question types: choice, score, noul
   backends/  teachers.py       LLMs for the generator (Ollama, any OpenAI-compatible API) and the Jev teacher
-  data/                        generation by construction, long states (LongStateBuilder), JSONL
+  data/                        generation by construction, the judge (verify), long states (LongStateBuilder), JSONL
   model/                       checkpoint loading, context extension (YaRN)
   train/                       RLCD, calibration, the pipeline
   evaluate/                    metrics per question type and by length, table and chart
   cli.py  __init__.py          `layaft <mode> key=value` and the LayaFT facade
-tasks/       helpdesk.yaml, its test set and contexts
+tasks/       helpdesk.yaml and tool_routing.yaml, with their test sets and contexts
 notebooks/   the three steps, explained
 examples/    one Python script per mode, with its CLI equivalent
 slurm/       one Slurm job per mode
