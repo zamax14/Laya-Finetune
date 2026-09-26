@@ -9,6 +9,16 @@ import json
 import random
 
 POSITIONS = ("start", "middle", "end")
+LONG = 2048  # Above this context, training adds long copies and evaluation measures by length.
+
+
+def token_counter(tokenizer):
+    return lambda text: len(tokenizer(text, add_special_tokens=False)["input_ids"])
+
+
+def state_budget(agent):
+    """Tokens the state can take: the context minus the question and options (`head_max_len`) and a margin."""
+    return agent.cfg["max_len"] - agent.cfg["head_max_len"] - 16
 
 
 class LongStateBuilder:

@@ -3,7 +3,10 @@ import random
 import statistics
 import time
 
-from layaft.data.compose import POSITIONS
+from layaft.data import io
+from layaft.data.compose import POSITIONS, LongStateBuilder, state_budget, token_counter
+
+LENGTHS = (8192, 16384, 32768, 65536)
 
 
 def evaluate(agent, cases, task):
@@ -33,3 +36,10 @@ def by_length(agent, cases, task, builder, lengths, seed=0):
         long = [builder.build(c, length, POSITIONS[i % 3], rng) for i, c in enumerate(cases)]
         out[str(length)] = evaluate(agent, long, task)[0]
     return out
+
+
+def by_ctx(agent, cases, task, seed=0):
+    """`by_length` at 8k/16k/32k/64k up to the agent's context, with the held-out filler."""
+    budget = state_budget(agent)
+    builder = LongStateBuilder(task, io.fillers(task, held_out=True), token_counter(agent.tok))
+    return by_length(agent, cases, task, builder, [n for n in LENGTHS if n < budget] + [budget], seed)

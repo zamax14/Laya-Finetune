@@ -19,6 +19,12 @@ def filler_path(task):
     return config.DATA / f"{task.name}_filler.jsonl"
 
 
+def fillers(task, held_out=False):
+    """Filler texts: a tenth is held out for evaluation, so test states never reuse training filler."""
+    texts = [r["text"] for r in read(filler_path(task))]
+    return texts[::10] if held_out else [t for i, t in enumerate(texts) if i % 10]
+
+
 def read(path):
     if not path.exists():
         return []
