@@ -157,6 +157,12 @@ Laya will read and answers the same questions. Cases where it agrees on every qu
 The rest go to `<data>_rejected.jsonl` with its answers, for auditing. Cases already judged are skipped, so it can run
 after every generation round. Train with `data=data/<task>_verified.jsonl`.
 
+A second judge can re-read the rejected file (`data=data/<task>_rejected.jsonl`). Cases whose label it confirms go to
+`_rejected_verified.jsonl`. If it answers exactly like the first judge, and that answer is a valid combination, the
+case is relabelled with that answer in `_rejected_relabelled.jsonl`. Two models that agree blind make a better label
+than a generator that missed its brief, and these messages are the hard ones. On tool routing, the two judges agreed
+on about 3 in 4 rejected cases.
+
 ### Teacher
 
 Jev answers the same questions on every case; its distribution softens the target (70 % label, 30 % Jev), so Laya
