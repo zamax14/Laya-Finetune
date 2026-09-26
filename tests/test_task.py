@@ -1,6 +1,10 @@
 """The helpdesk task and its 20 test tickets."""
 import hashlib
+import re
 import unittest
+from pathlib import Path
+
+import yaml
 
 from pydantic import ValidationError
 
@@ -50,6 +54,12 @@ class TaskChecks(unittest.TestCase):
         # The same hash as the first generator (title + description), so the teacher's cache keeps working.
         self.assertEqual(TASK.case_id({"titulo": "VPN", "descripcion": "caída"}),
                          hashlib.sha1("VPNcaída".encode()).hexdigest()[:12])
+
+    def test_readme_example_task_loads(self):
+        readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+        task = Task(yaml.safe_load(re.search(r"```yaml\n(name: invoices.*?)```", readme, re.S).group(1)))
+        self.assertEqual(len(task.combos()), 9)  # 3 × 2 × 2, minus the 3 with high urgency and duplicate: true.
+        self.assertEqual(task.questions["expense_type"].options["travel"].signals, "a booking, a route or a stay")
 
 
 if __name__ == "__main__":
