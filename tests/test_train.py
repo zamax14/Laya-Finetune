@@ -8,6 +8,7 @@ from unittest import mock
 
 from layaft.task import Task
 from layaft.train import pipeline
+from layaft.train.calibrate import calibrate
 from layaft.train.rlcd import batches, targets
 
 TASK = Task.load("helpdesk")
@@ -27,6 +28,18 @@ def fake_pipeline(tmp, **kw):
 
 
 class TrainChecks(unittest.TestCase):
+    def test_calibration_fits_the_label_not_the_smoothing(self):
+        # A model that outputs exactly the smoothed target (90 %) and is always right should be sharpened (T < 1).
+        import torch
+        target = [.9, .05, .05]
+        items = [{"qtype": 0, "markers": [0, 1, 2], "target": target} for _ in range(20)]
+        logits = torch.log(torch.tensor([target] * 20))
+        trainer = mock.Mock(qtypes={"choice": 0, "score": 1, "noul": 2})
+        trainer.logits.return_value = [(logits, None, items)]
+        fitted = calibrate(trainer, items)
+        self.assertLess(fitted[0], .8)
+        self.assertEqual(fitted[1:], [1.0, 1.0])  # Fewer than 10 cases of those types.
+
     def test_targets_blend_the_teacher_or_smooth_without_it(self):
         teacher = {"1": {"categoria": {"probabilities": {k: 1 / 6 for k in TASK.questions["categoria"].keys}},
                          "prioridad": {"probabilities": {str(i): .25 for i in range(4)}}, "bloqueo": {"noul": .2}}}

@@ -27,7 +27,11 @@ def calibrate(trainer, items):
     pairs = {qt: [] for qt in range(3)}
     for logits, _, chunk in trainer.logits(items):
         for r, it in enumerate(chunk):
-            pairs[it["qtype"]].append((logits[r, :len(it["markers"])].cpu(), torch.tensor(it["target"])))
+            # Against the label (the target's top option), not the smoothed target: calibrated confidence must match
+            # how often the model is right, not the 90 % the smoothing caps it at.
+            target = torch.tensor(it["target"])
+            label = torch.nn.functional.one_hot(target.argmax(), len(target)).float()
+            pairs[it["qtype"]].append((logits[r, :len(it["markers"])].cpu(), label))
     fitted = [fit_temperature(pairs[qt]) for qt in range(3)]
     trainer.agent.temperature, trainer.agent.temperature_by_options = fitted, {}
     print("Temperatures:", {name: round(fitted[i], 3) for name, i in trainer.qtypes.items()},
