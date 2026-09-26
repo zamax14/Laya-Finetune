@@ -130,7 +130,10 @@ class Choice(Question):
         return "green" if confidence > self.review["green"] else "yellow" if confidence >= self.review["yellow"] else "red"
 
     def record(self, answer, expected):
-        out = super().record(answer, expected)
+        # Laya's `confidence` for a choice is 1 − normalized entropy, not a probability (0.64 for 0.9/0.05/0.05):
+        # the ECE and the traffic light need the probability of the chosen option, which calibration fits.
+        p = (answer.get("probabilities") or {}).get(answer["choice"], answer["confidence"])
+        out = {**super().record(answer, expected), "confidence": round(100 * p, 1)}
         if self.review:
             out["light"] = self.light(out["confidence"])
         return out

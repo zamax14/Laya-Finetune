@@ -43,6 +43,9 @@ class QuestionChecks(unittest.TestCase):
         self.assertEqual((m["correct"], m["total"]), (1, 2))
         self.assertEqual(m["lights"]["green"], {"correct": 1, "total": 1})
         self.assertEqual(m["lights"]["yellow"], {"correct": 0, "total": 1})
+        # With Laya's probabilities the light uses the chosen option's, not the entropy-based confidence.
+        laya = CHOICE.record({"choice": "a", "confidence": .64, "probabilities": {"a": .9, "b": .05, "c": .05}}, "a")
+        self.assertEqual((laya["confidence"], laya["light"]), (90.0, "green"))
         s = SCORE.metrics([SCORE.record({"score": 1.4, "confidence": .5}, "high"),
                            SCORE.record({"score": 0, "confidence": .5}, "high")])
         self.assertEqual((s["correct"], s["near"], s["total"]), (0, 1, 2))
