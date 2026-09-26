@@ -52,6 +52,15 @@ class TaskChecks(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 TASK.schema.model_validate({"items": [bad]})
 
+    def test_optional_field_may_be_empty(self):
+        task = Task({"name": "t", "fields": {"history": {"required": False, "min_words": 3}, "message": {}},
+                     "state": {"m": "{message}"}, "questions": {"q": {"type": "noul", "instructions": "?"}},
+                     "data": {"test": "t.jsonl"}})
+        self.assertEqual(task.schema.model_validate({"items": [{"history": "", "message": "hola"}]}).items[0].history, "")
+        for bad in ({"history": "dos palabras", "message": "hola"}, {"history": "", "message": ""}):
+            with self.assertRaises(ValidationError):
+                task.schema.model_validate({"items": [bad]})
+
     def test_case_id_is_stable(self):
         # The same hash as the first generator (title + description), so the teacher's cache keeps working.
         self.assertEqual(TASK.case_id({"titulo": "VPN", "descripcion": "caída"}),

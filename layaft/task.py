@@ -36,10 +36,13 @@ class _Item(BaseModel):
     """One generated text. The checks stay out of the JSON Schema (OpenRouter's strict mode rejects them)."""
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     min_words: ClassVar[dict] = {}
+    optional: ClassVar[set] = set()
 
     @model_validator(mode="after")
     def complete(self):
         for name, value in self:
+            if not value and name in self.optional:
+                continue
             if not value:
                 raise ValueError(f"{name} is empty")
             if len(value.split()) < self.min_words.get(name, 0):
@@ -112,6 +115,7 @@ class Task:
         """Pydantic model of a generated batch: its JSON Schema constrains the LLM and it validates the reply."""
         item = create_model("Item", __base__=_Item, **{name: (str, ...) for name in self.fields})
         item.min_words = {name: f["min_words"] for name, f in self.fields.items() if f and f.get("min_words")}
+        item.optional = {name for name, f in self.fields.items() if f and f.get("required") is False}
         return create_model("Batch", __config__=ConfigDict(extra="forbid"), items=(list[item], ...))
 
     def read_cases(self, path=None, graded=True):
