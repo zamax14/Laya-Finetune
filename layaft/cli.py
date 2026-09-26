@@ -2,6 +2,7 @@
 
     layaft generate task=helpdesk backend=openrouter n=216 context=all
     layaft generate task=helpdesk backend=ollama llm=gemma3:12b filler=200
+    layaft verify task=helpdesk llm=gemma4:31b
     layaft train task=helpdesk ctx=16k profile=full
     layaft val task=helpdesk model=runs/helpdesk-16k ctx=16k
     layaft predict task=helpdesk model=runs/helpdesk-16k state="La VPN se cae cada hora"
@@ -12,7 +13,7 @@
 import json
 import sys
 
-MODES = ("generate", "train", "val", "predict", "extend")
+MODES = ("generate", "verify", "train", "val", "predict", "extend")
 
 
 def parse_value(text):

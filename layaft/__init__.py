@@ -3,6 +3,7 @@
     from layaft import LayaFT
     m = LayaFT("multilingual")                                  # or "english", a Hub repo, a local checkpoint
     m.generate(task="helpdesk", backend="ollama", n=216)        # synthetic cases labelled by construction
+    m.verify(task="helpdesk", llm="gemma4:31b")                 # a second LLM drops the mislabelled ones
     m.train(task="helpdesk", ctx="16k", profile="full")          # RLCD + calibration → runs/helpdesk-16k
     m.val(task="helpdesk")
     m.predict({"ticket": "The VPN drops every hour"}, task="helpdesk")
@@ -47,6 +48,15 @@ class LayaFT:
             print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
         print(f"Total: {total} cases" + (f" for US${cost:.2f}" if cost else ""))
         return total
+
+    def verify(self, task, llm, backend="ollama", data=None, api_key=None, base_url=None, ollama_url=None, parallel=None):
+        """A second LLM (another family than the generator) answers every case blind; the cases where it agrees with
+        the label go to <data>_verified.jsonl, the rest to <data>_rejected.jsonl. Returns how many were kept."""
+        from pathlib import Path
+        from layaft.backends import create_backend
+        from layaft.data.verify import verify
+        judge = create_backend(backend, llm, api_key, base_url, ollama_url, parallel)
+        return len(verify(_task(task), judge, data and Path(data))[0])
 
     def train(self, task, ctx=None, profile="test", epochs=None, teacher="jev", data=None, out=None, gpu_limit=None,
               long=600):
