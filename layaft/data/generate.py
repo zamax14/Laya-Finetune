@@ -106,7 +106,6 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
 
     with ThreadPoolExecutor(llm.parallel) as executor:
         cost = sum(executor.map(one, combos))
-    llm.unload()
     return written, cost
 
 
@@ -137,5 +136,4 @@ def generate_filler(task, llm, n, context=None, path=None, per_call=3):
         results = list(executor.map(one, range(calls)))
     rows = [r for docs, _ in results for r in docs]
     io.append(path, rows)
-    llm.unload()
     return rows, sum(c for _, c in results)

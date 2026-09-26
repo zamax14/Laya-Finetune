@@ -40,11 +40,14 @@ class LayaFT:
         llm_ = create_backend(backend, llm, api_key, base_url, ollama_url, parallel)
         contexts = task.contexts() if context == "all" else [context or task.default_context]
         total, cost = 0, 0.0
-        for i, ctx in enumerate(contexts, 1):
-            rows, spent = generate(task, llm_, n, ctx, seed=seed, only=only) if n else ([], 0.0)
-            docs, spent_filler = generate_filler(task, llm_, -(-filler // len(contexts)), ctx) if filler else ([], 0.0)
-            total, cost = total + len(rows), cost + spent + spent_filler
-            print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
+        try:
+            for i, ctx in enumerate(contexts, 1):
+                rows, spent = generate(task, llm_, n, ctx, seed=seed, only=only) if n else ([], 0.0)
+                docs, spent_filler = generate_filler(task, llm_, -(-filler // len(contexts)), ctx) if filler else ([], 0.0)
+                total, cost = total + len(rows), cost + spent + spent_filler
+                print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
+        finally:
+            llm_.unload()  # Frees Ollama's VRAM once, not per context: training usually comes next on the same GPU.
         print(f"Total: {total} cases" + (f" for US${cost:.2f}" if cost else ""))
         return total
 
@@ -85,9 +88,9 @@ class LayaFT:
     def predict(self, state, task, ctx=None, device="cuda"):
         """Typed answers for one state (a string or a dict), with the task's questions."""
         from layaft.model.load import load
-        if not hasattr(self, "_agent"):
-            self._agent = load(self.model, device, _ctx(ctx))
-        return self._agent.predict(state, _task(task).laya)["answers"]
+        if getattr(self, "_loaded", (None,))[0] != self.model:  # Reloaded after train/extend change the model.
+            self._loaded = (self.model, load(self.model, device, _ctx(ctx)))
+        return self._loaded[1].predict(state, _task(task).laya)["answers"]
 
     def extend(self, ctx, out=None):
         """A copy of the checkpoint with room for ctx tokens (YaRN); train it with `train(ctx=...)`."""
