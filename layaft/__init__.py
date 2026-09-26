@@ -58,7 +58,7 @@ class LayaFT:
         return self.model
 
     def val(self, task, ctx=None, device="cuda", save=True):
-        """The hand-written test set; with ctx above 2048 (compose.LONG), also wrapped in filler at 8k/16k/32k/64k up to ctx."""
+        """The hand-written test set, saved in runs/val/<task>-<model>/; with ctx above 2048 (compose.LONG), also wrapped in filler at 8k/16k/32k/64k up to ctx."""
         import json
         from layaft.data.compose import LONG
         from layaft.evaluate import report, run
@@ -74,7 +74,8 @@ class LayaFT:
         else:
             print(report.table(task, {self.model: summary}))
         if save:
-            path = config.RUNS / f"{task.name}-val"
+            from pathlib import Path
+            path = config.RUNS / "val" / f"{task.name}-{Path(self.model).name.split('@')[0]}"
             path.mkdir(parents=True, exist_ok=True)
             (path / "results.json").write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str))
             report.chart(task, out.get("by_length") or {self.model: summary}, path / "chart.svg",

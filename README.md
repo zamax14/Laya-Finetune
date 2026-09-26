@@ -122,7 +122,7 @@ m.predict({"ticket": "La VPN se cae cada hora desde ayer"}, task="helpdesk")
 |---|---|---|
 | `generate` | Writes cases labelled by construction to `data/<task>.jsonl`; `filler=` also writes the neutral documents for long context | `backend`, `llm`, `n`, `context` (`all` = the task's file), `filler`, `api_key`, `base_url`, `parallel`, `only` |
 | `train` | Teacher, split, RLCD, calibration, comparison, checkpoint in Laya's format under `runs/` | `profile` (`test`/`full`), `ctx`, `epochs`, `teacher` (`jev`/`none`), `long`, `gpu_limit` |
-| `val` | Test-set metrics, table and chart in `runs/<task>-val/`; with `ctx`, also by length | `ctx` |
+| `val` | Test-set metrics, table and chart in `runs/val/<task>-<model>/`; with `ctx`, also by length | `ctx` |
 | `predict` | Typed answers for one state | `state`, `ctx` |
 | `extend` | Copies a checkpoint with room for `ctx` tokens (no training) | `ctx`, `out` |
 
