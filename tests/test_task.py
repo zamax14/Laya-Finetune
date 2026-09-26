@@ -1,6 +1,8 @@
 """The helpdesk task and its 20 test tickets."""
 import hashlib
+import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -54,6 +56,24 @@ class TaskChecks(unittest.TestCase):
         # The same hash as the first generator (title + description), so the teacher's cache keeps working.
         self.assertEqual(TASK.case_id({"titulo": "VPN", "descripcion": "caída"}),
                          hashlib.sha1("VPNcaída".encode()).hexdigest()[:12])
+
+    def test_dataset_format_is_validated_line_by_line(self):
+        fields = {"titulo": "VPN", "solicitante": "Ana", "area": "Ventas", "descripcion": "La VPN se cae"}
+        good = {"fields": fields, "answers": {"categoria": "redes", "prioridad": "alta", "bloqueo": True}, "extra": 1}
+        bad = [({**good, "fields": {"titulo": "VPN"}}, "fields"),                            # A field is missing.
+               ({**good, "answers": {**good["answers"], "bloqueo": 1}}, "bloqueo=1"),         # noul takes true/false.
+               ({**good, "answers": {**good["answers"], "prioridad": "urgente"}}, "prioridad"),
+               ({**good, "answers": {**good["answers"], "categoria": None}}, "categoria")]    # Training needs every answer.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cases.jsonl"
+            path.write_text(json.dumps(good) + "\n")
+            case = TASK.read_cases(path)[0]
+            self.assertEqual((case["id"], case["extra"]), (TASK.case_id(fields), 1))  # id is optional.
+            for row, message in bad:
+                path.write_text(json.dumps(good) + "\n" + json.dumps(row) + "\n")
+                with self.assertRaisesRegex(ValueError, f"cases.jsonl:2: .*{message}"):
+                    TASK.read_cases(path)
+            self.assertEqual(TASK.read_cases(Path(tmp) / "missing.jsonl"), [])
 
     def test_readme_example_task_loads(self):
         readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")

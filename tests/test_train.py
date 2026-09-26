@@ -14,7 +14,8 @@ TASK = Task.load("helpdesk")
 
 
 def case(i, categoria="redes", prioridad="alta", bloqueo=True):
-    return {"id": str(i), "fields": {}, "answers": {"categoria": categoria, "prioridad": prioridad, "bloqueo": bloqueo}}
+    fields = {"titulo": f"caso {i}", "solicitante": "Ana", "area": "Ventas", "descripcion": "texto"}
+    return {"id": str(i), "fields": fields, "answers": {"categoria": categoria, "prioridad": prioridad, "bloqueo": bloqueo}}
 
 
 def fake_pipeline(tmp, **kw):

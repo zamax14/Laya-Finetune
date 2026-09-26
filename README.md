@@ -70,11 +70,36 @@ questions:
   duplicate: {type: noul, instructions: "Does the `invoice` say it was already paid?"}
 exclude: [{urgency: high, duplicate: true}]           # combinations that make no sense
 generation: {text_field: body, default_context: supplier invoices of a mid-size company in Spain}
-test: invoices_test.jsonl                             # hand-written {"id", "fields", "answers"}, never trained on
+data: {test: invoices_test.jsonl}                     # hand-written cases, never trained on (format below)
 ```
 
 The full example with every option is [`tasks/helpdesk.yaml`](tasks/helpdesk.yaml). It covers the traffic light on
 confidence (`review`), per-option `signals`, `leak_phrases`, a custom `prompt` in Spanish and a contexts file.
+
+## Dataset format
+
+One format for everything: generated cases, your own labelled data and the test set are **JSON Lines**, one case
+per line.
+
+```json
+{"fields": {"vendor": "Iberia", "body": "Flight MAD-MEX on 12 May, seat 23C…"}, "answers": {"expense_type": "travel", "urgency": "low", "duplicate": false}}
+```
+
+- `fields` has every field of the task; `answers` has every question with one of its keys (a `noul` is `true`/`false`).
+- `id` is optional (a hash of the text by default); any other key (`context`, `model`…) is kept and ignored.
+- In the test set an answer may be `null`: an ambiguous case on purpose, not graded for that question.
+
+The task's `data:` section says where the files are, relative to the YAML file, like YOLO's `data.yaml`:
+
+```yaml
+data:
+  train: ../data/invoices.jsonl         # default: data/<name>.jsonl in the working directory
+  test: invoices_test.jsonl             # required
+  filler: ../data/invoices_filler.jsonl # default: data/<name>_filler.jsonl; {"text": ...} per line, for long context
+```
+
+`generate` appends to `train`; with your own data, skip it and point `train` at your file. Every file is checked
+line by line when it is read, and an error names the file, the line and the field.
 
 ## Modes
 

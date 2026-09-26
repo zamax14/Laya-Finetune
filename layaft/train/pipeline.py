@@ -40,7 +40,7 @@ class TrainPipeline:
         self.source = resolve(model)
         self.ctx = ctx or json.loads((self.source / "rl_agent_config.json").read_text())["max_len"]
         self.teacher, self.long = create_teacher(teacher), long
-        self.data = data or io.cases_path(task)
+        self.data = data or task.train_path
         self.out = out or _next_run(f"{task.name}-{self.ctx // 1024}k" + ("-test" if profile == "test" else ""))
 
     def run(self):
@@ -48,7 +48,7 @@ class TrainPipeline:
         torch.manual_seed(self.seed)
         self.check_gpu()
         cases = self.load_cases()
-        teacher = self.teacher.label(cases, self.task, io.teacher_path(self.task))
+        teacher = self.teacher.label(cases, self.task, self.task.teacher_path)
         train, calib, val = self.split(cases, teacher)
         agent = self.load_model()
         train, calib, val, teacher = self.lengthen(agent, train, calib, val, teacher)
@@ -88,7 +88,7 @@ class TrainPipeline:
             print(f"GPU cap: {limit} GB ({limit - 0.4:.1f} GB for tensors) of {total / 2**30:.1f} GB")
 
     def load_cases(self):
-        cases = io.read(self.data)
+        cases = self.task.read_cases(self.data)
         if not cases:
             raise SystemExit(f"No cases in {self.data}: generate them with `layaft generate task={self.task.name}`.")
         per_combo = self.cfg["cases_per_combo"]
@@ -134,7 +134,7 @@ class TrainPipeline:
         rng, budget = random.Random(self.seed), state_budget(agent)
         splits = [builder.spread(rng.sample(cases, min(n, len(cases))), budget, rng.randrange(2**32))
                   for cases, n in ((train, self.long), (calib, self.long // 10), (val, self.long // 10))]
-        teacher = {**teacher, **self.teacher.label([c for s in splits for c in s], self.task, io.teacher_path(self.task))}
+        teacher = {**teacher, **self.teacher.label([c for s in splits for c in s], self.task, self.task.teacher_path)}
         long_train, long_calib, long_val = ([c for c in s if self.agrees(c, teacher)] for s in splits)
         print(f"Long copies up to {budget} tokens: train {len(long_train)} · calibration {len(long_calib)} · validation {len(long_val)}")
         return train + long_train, calib + long_calib, val + long_val, teacher

@@ -5,7 +5,18 @@
     task.combos()                         # every answer combination the generator writes texts for
     task.state(case)                      # what Laya reads for a case
 
-A case is `{"id", "fields": {...}, "answers": {question id: value}}`; generated cases add context, model and date.
+Dataset format: JSON Lines, one case per line, the same for generated data, your own labelled data and the test set:
+
+    {"fields": {"message": "..."}, "answers": {"action": "use_tools", "web_search": true}}
+
+`fields` has every field of the task; `answers` has every question with one of its keys (a `noul` is true/false).
+`id` is optional (a hash of the text by default); any other key (context, model…) is kept and ignored. The task's
+`data:` section says where the files are, relative to the YAML file:
+
+    data:
+      train: ../data/my_task.jsonl      # default: data/<name>.jsonl in the working directory
+      test: my_task_test.jsonl          # required: hand-written, never trained on; a null answer is not graded
+      filler: ../data/my_filler.jsonl   # default: data/<name>_filler.jsonl; {"text": ...} per line, for long context
 """
 import hashlib
 import itertools
@@ -49,6 +60,11 @@ class Task:
         self.prompt = gen.get("prompt")
         self.default_context = gen.get("default_context", f"texts for the task {self.name}")
         self.per_call = gen.get("per_call", 5)
+        data = spec.get("data", {})
+        self.train_path = self.root / data["train"] if "train" in data else config.DATA / f"{self.name}.jsonl"
+        self.filler_path = self.root / data["filler"] if "filler" in data else config.DATA / f"{self.name}_filler.jsonl"
+        self.test_path = self.root / data["test"]
+        self.teacher_path = config.DATA / f"{self.name}_teacher.jsonl"  # The teacher's answers, a cache.
         clash = set(self.fields) & set(self.questions)
         if clash:
             raise ValueError(f"task {self.name}: {sorted(clash)} is both a field and a question")
@@ -98,15 +114,32 @@ class Task:
         item.min_words = {name: f["min_words"] for name, f in self.fields.items() if f and f.get("min_words")}
         return create_model("Batch", __config__=ConfigDict(extra="forbid"), items=(list[item], ...))
 
+    def read_cases(self, path=None, graded=True):
+        """Validated cases from a JSONL file (the training data by default). `graded=False` accepts null answers."""
+        path = Path(path or self.train_path)
+        if not path.exists():
+            return []
+        cases = []
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.strip():
+                cases.append(self._check(json.loads(line), f"{path.name}:{n}", graded))
+        return cases
+
+    def _check(self, case, where, graded):
+        fields, answers = case.get("fields") or {}, case.get("answers") or {}
+        if set(fields) != set(self.fields):
+            raise ValueError(f"{where}: fields {sorted(fields)}, the task expects {sorted(self.fields)}")
+        for qid, q in self.questions.items():
+            value = answers.get(qid)
+            if value is None and not graded:
+                continue
+            if (type(value), value) not in {(type(k), k) for k in q.keys}:  # A noul takes true/false, not 1/0.
+                raise ValueError(f"{where}: {qid}={value!r}, expected one of {q.keys}")
+        return {**case, "id": case.get("id") or self.case_id(fields)}
+
     def test_cases(self):
         """The hand-written test set: never trained on, only measured."""
-        path = self.root / self.spec["test"]
-        cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        for case in cases:
-            for qid, value in case["answers"].items():
-                if value is not None and value not in self.questions[qid].keys:
-                    raise ValueError(f"{path.name} {case['id']}: {qid}={value!r} is not one of {self.questions[qid].keys}")
-        return cases
+        return self.read_cases(self.test_path, graded=False)
 
     def contexts(self):
         path = self.spec.get("generation", {}).get("contexts")

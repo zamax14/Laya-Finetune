@@ -109,6 +109,7 @@ generation:
     - Área del solicitante: una de {area}. Inventa nombres y apellidos hispanos variados.
     - Situaciones distintas de estas, que ya existen: {seen}.
 
-# Hand-written, with real details and no hints of the answer; never trained on. T-1020 is ambiguous on purpose
-# (category null): it should come out red.
-test: helpdesk_test.jsonl
+data:
+  # Hand-written, with real details and no hints of the answer; never trained on. T-1020 is ambiguous on purpose
+  # (category null): it should come out red. Training data and filler use the defaults: data/helpdesk*.jsonl.
+  test: helpdesk_test.jsonl

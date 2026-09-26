@@ -68,7 +68,7 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
     `only` limits the combinations, e.g. {"categoria": ["seguridad"]} to reinforce one with few valid cases. Each
     combination is written as soon as it is done: if the run stops, what was generated stays.
     """
-    context, path = context or task.default_context, path or io.cases_path(task)
+    context, path = context or task.default_context, path or task.train_path
     taken = {norm(task.title(c)) for c in task.test_cases() + io.read(path)}
     seed = seed if seed is not None else time.time_ns()
     pool = [c for c in task.combos() if not only or all(c[q] in v for q, v in only.items())]
@@ -119,7 +119,7 @@ FILLER = create_model("Fillers", __config__=ConfigDict(extra="forbid"), items=(l
 
 def generate_filler(task, llm, n, context=None, path=None, per_call=3):
     """About n neutral documents for long states, cached per task. Returns (rows, cost)."""
-    context, path = context or task.default_context, path or io.filler_path(task)
+    context, path = context or task.default_context, path or task.filler_path
     prompt = task.spec.get("generation", {}).get("filler_prompt") or FILLER_PROMPT
     schema, calls = FILLER.model_json_schema(), -(-n // per_call)
 
