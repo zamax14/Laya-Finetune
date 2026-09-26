@@ -51,12 +51,14 @@ class LayaFT:
 
     def verify(self, task, llm, backend="ollama", data=None, api_key=None, base_url=None, ollama_url=None, parallel=None):
         """A second LLM (another family than the generator) answers every case blind; the cases where it agrees with
-        the label go to <data>_verified.jsonl, the rest to <data>_rejected.jsonl. Returns how many were kept."""
+        the label go to <data>_verified.jsonl, the rest to <data>_rejected.jsonl. Run on a rejected file, the cases
+        where it answers like the first judge go to <data>_relabelled.jsonl. Returns how many were kept or relabelled."""
         from pathlib import Path
         from layaft.backends import create_backend
         from layaft.data.verify import verify
         judge = create_backend(backend, llm, api_key, base_url, ollama_url, parallel)
-        return len(verify(_task(task), judge, data and Path(data))[0])
+        kept, relabelled, _ = verify(_task(task), judge, data and Path(data))
+        return len(kept) + len(relabelled)
 
     def train(self, task, ctx=None, profile="test", epochs=None, teacher="jev", data=None, out=None, gpu_limit=None,
               long=600):

@@ -37,13 +37,29 @@ class VerifyChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "tool_routing.jsonl"
             io.append(path, cases)
-            kept, rejected = verify(TASK, judge, path)
-            self.assertEqual((len(kept), len(rejected)), (3, 1))
+            kept, relabelled, rejected = verify(TASK, judge, path)
+            self.assertEqual((len(kept), len(relabelled), len(rejected)), (3, 0, 1))
             self.assertFalse(rejected[0]["judge"]["web_search"])
-            kept_path, rejected_path = outputs(path)
+            kept_path, relabelled_path, rejected_path = outputs(path)
             self.assertEqual(len(io.read(kept_path)), 3)
-            self.assertEqual(verify(TASK, judge, path), ([], []))  # Nothing new to judge.
+            self.assertEqual(verify(TASK, judge, path), ([], [], []))  # Nothing new to judge.
             self.assertEqual(judge.calls, 4)
+
+            # A second judge on the rejected file that answers like the first one relabels the case.
+            _, relabelled, _ = verify(TASK, judge, rejected_path)
+            self.assertEqual(len(relabelled), 1)
+            self.assertEqual(relabelled[0]["answers"], rejected[0]["judge"])
+            self.assertTrue(relabelled[0]["generated"]["web_search"])
+            self.assertEqual(len(io.read(outputs(rejected_path)[1])), 1)
+
+    def test_relabel_only_to_a_valid_combination(self):
+        case = TASK.test_cases()[0]
+        invalid = {**case["answers"], "action": "ask_user", "email": True}  # Asking the user uses no tool.
+        judge = FakeJudge({case["fields"]["message"]: invalid})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "r.jsonl"
+            io.append(path, [{**case, "judge": invalid}])
+            self.assertEqual([len(x) for x in verify(TASK, judge, path)], [0, 0, 1])
 
     def test_schema_only_accepts_valid_keys(self):
         schema = judge_schema(TASK).model_json_schema()
