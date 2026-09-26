@@ -52,12 +52,15 @@ def extend(src, ctx, out):
 
 def attention_for(ctx):
     """flash_attention_2 if installed. Above 8192, flex_attention when Triton can compile it (it builds a C launcher
-    against Python.h): sdpa builds a dense ctx² mask for the sliding-window layers, which ran out of memory at 16k on
-    a 6 GB GPU but fits on large ones (~2 GB at 32k). sdpa otherwise, as Laya ships."""
+    against Python.h, from Python's include directory or from CPATH, as gcc does): sdpa builds a dense ctx² mask for
+    the sliding-window layers, which ran out of memory at 16k on a 6 GB GPU but fits on large ones (~2 GB at 32k).
+    sdpa otherwise, as Laya ships."""
     import importlib.util
+    import os
     import sysconfig
     if importlib.util.find_spec("flash_attn"):
         return "flash_attention_2"
-    if ctx > 8192 and (Path(sysconfig.get_paths()["include"]) / "Python.h").exists():
+    includes = [sysconfig.get_paths()["include"], *os.environ.get("CPATH", "").split(os.pathsep)]
+    if ctx > 8192 and any((Path(d) / "Python.h").exists() for d in includes if d):
         return "flex_attention"
     return "sdpa"

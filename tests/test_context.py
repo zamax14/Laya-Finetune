@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 from pathlib import Path
 
 from layaft.model.context import attention_for, extend, parse_ctx
@@ -61,6 +62,12 @@ class ContextChecks(unittest.TestCase):
     def test_attention_choice(self):
         self.assertEqual(attention_for(1024), "sdpa")
         self.assertIn(attention_for(32768), ("flex_attention", "flash_attention_2", "sdpa"))  # sdpa without Python.h.
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("sysconfig.get_paths", return_value={"include": "/none"}), \
+                mock.patch("importlib.util.find_spec", return_value=None):
+            self.assertEqual(attention_for(32768), "sdpa")
+            (Path(tmp) / "Python.h").touch()
+            with mock.patch.dict("os.environ", {"CPATH": tmp}):
+                self.assertEqual(attention_for(32768), "flex_attention")  # Headers unpacked next to the venv.
 
 
 if __name__ == "__main__":
