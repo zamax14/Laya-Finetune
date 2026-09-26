@@ -17,7 +17,8 @@ source .venv/bin/activate
 pip install -e .
 
 # Option 1: command line
-layaft val task=helpdesk model=runs/helpdesk-32k ctx=32k
+layaft val task=tool_routing model=multilingual
+layaft val task=tool_routing model=runs/tool_routing-32k ctx=32k
 
 # Option 2: Python script (same result)
 # python examples/val.py

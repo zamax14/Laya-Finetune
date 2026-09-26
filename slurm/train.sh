@@ -16,8 +16,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
-# Option 1: command line
-layaft train task=helpdesk model=multilingual profile=full ctx=32k
+# Option 1: command line (teacher=none: without a Jev key the constructed label is smoothed instead)
+# 1. 1,024 tokens, the checkpoint's own context → runs/tool_routing-1k
+layaft train task=tool_routing model=multilingual profile=full teacher=none
+# 2. 8k: positions mmBERT already has, now trained on long states → runs/tool_routing-8k
+layaft train task=tool_routing model=runs/tool_routing-1k profile=full ctx=8k teacher=none
+# 3. 32k: YaRN ×4 on the global-attention layers → runs/tool_routing-32k
+layaft train task=tool_routing model=runs/tool_routing-8k profile=full ctx=32k teacher=none
 
 # Option 2: Python script (same result)
 # python examples/train.py
