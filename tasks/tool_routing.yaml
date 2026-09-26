@@ -6,8 +6,8 @@
 name: tool_routing
 
 fields:
-  history: {min_words: 8}   # 1–4 earlier turns: they may carry what the message takes for granted ("send it to him").
-  message: {min_words: 2}   # What the person writes now: often short.
+  history: {required: false, min_words: 6}  # 0–4 earlier turns: they may carry what the message takes for granted ("send it to him").
+  message: {}                                # What the person writes now: often a few words.
 
 state:
   conversation: "{history}"
@@ -71,6 +71,38 @@ generation:
   per_call: 5
   contexts: tool_routing_contexts.txt
   default_context: asistente de IA de una empresa mediana en México, usado por su personal
+  # The real mix, not one case per combination: each tool a message needs multiplies its weight by 0.35, so one tool
+  # is more common than two and five almost never happen. Shares: answer directly 20 %, ask the user 12 %, one tool
+  # 34 %, two 24 %, three 8 %, four or five 2 %.
+  weights:
+    - {action: answer_directly, weight: 1.0}
+    - {action: ask_user, weight: 0.6}
+    - {web_search: true, weight: 0.35}
+    - {calendar: true, weight: 0.35}
+    - {email: true, weight: 0.35}
+    - {files: true, weight: 0.35}
+    - {database: true, weight: 0.35}
+  vary:  # One option of each per call: every batch of 5 shares them, the dataset gets all of them.
+    length:
+      - muy cortos, de 1 a 8 palabras, como un chat rápido
+      - muy cortos, de 1 a 8 palabras, como un chat rápido
+      - cortos, de 8 a 20 palabras
+      - cortos, de 8 a 20 palabras
+      - de 20 a 40 palabras
+      - largos, de 40 a 90 palabras, con detalles y contexto de sobra
+    turns:
+      - "`history` vacío: es el primer mensaje de la conversación"
+      - "`history` vacío: es el primer mensaje de la conversación"
+      - "`history` con 1 o 2 turnos previos"
+      - "`history` con 1 o 2 turnos previos"
+      - "`history` con 3 o 4 turnos previos, y la respuesta depende de algo dicho en ellos"
+    style:
+      - como escribe la gente con prisa, sin acentos y con alguna falta de ortografía
+      - formal y cortés
+      - coloquial, con modismos del país del contexto
+      - directo, en imperativo
+      - indirecto, describe lo que quiere lograr sin pedir una acción concreta
+      - como pregunta
   prompt: |-
     Escribe {n} conversaciones distintas entre una persona y el asistente de IA de su trabajo, en el idioma del contexto (español si no indica otro).
     Contexto: {context}
@@ -83,12 +115,17 @@ generation:
     - ¿Necesita sus archivos o documentos?: {files.label}.
     - ¿Necesita consultar una base de datos o sistema interno?: {database.label}.
 
+    En este lote:
+    - Mensajes {length}.
+    - {turns}. Los turnos van en líneas separadas, con el formato «Usuario: …» y «Asistente: …».
+    - Estilo: {style}.
+
     Reglas:
-    - `history`: de 1 a 4 turnos previos breves, con el formato «Usuario: …» y «Asistente: …» en líneas separadas. Pueden aportar datos que el mensaje final da por sabidos («mándaselo a él», «ese archivo»).
-    - `message`: lo que la persona escribe ahora, como escribe la gente real: a veces corto y con faltas, a veces largo y con detalles.
-    - Varía: a veces la persona pide la acción de forma explícita («mándale un correo a…») y a veces solo describe lo que quiere lograr y la herramienta se deduce («¿llego a tiempo a la reunión con Pedro si salgo a las 5?»).
-    - Si una herramienta es «no», el mensaje no debe necesitarla, aunque toque temas cercanos.
-    - Si hay que preguntar al usuario, que falte de verdad algo esencial en toda la conversación.
+    - Una herramienta «no» no puede hacer falta, aunque el mensaje toque temas cercanos: hablar de un correo cuyo texto ya está en la conversación no necesita el correo; opinar sobre una reunión ya descrita no necesita el calendario; un dato que el asistente ya dio en `history` no se vuelve a buscar.
+    - Una herramienta «sí» tiene que hacer falta de verdad, aunque el mensaje no la nombre: a veces se pide explícito («mándale un correo a…») y a veces se deduce («¿llego a tiempo a lo de Pedro si salgo a las 5?» necesita el calendario).
+    - Responder directamente: saludos, gracias, reescribir, traducir o resumir texto que ya está en la conversación, cálculos, conocimiento general estable, opiniones y consejos.
+    - Preguntar al usuario: pediría una herramienta, pero falta algo esencial (a quién, qué archivo, qué fecha, de qué cliente) y no aparece en toda la conversación.
+    - Nada de nombres de herramientas ni de sistemas inventados de forma forzada; datos concretos y creíbles (nombres, fechas, montos, SKU, clientes).
     - Situaciones distintas de estas, que ya existen: {seen}.
   filler_prompt: |-
     Write {n} documents that could sit earlier in an AI assistant's context in this setting: {context}.
