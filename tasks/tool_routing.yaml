@@ -7,7 +7,7 @@ name: tool_routing
 
 fields:
   history: {required: false, min_words: 6}  # 0–4 earlier turns: they may carry what the message takes for granted ("send it to him").
-  message: {}                                # What the person writes now: often a few words.
+  message: {single_line: true}               # What the person writes now: often a few words, one chat message.
 
 state:
   conversation: "{history}"
@@ -98,6 +98,9 @@ generation:
       - "`history` con 1 o 2 turnos previos"
       - "`history` con 1 o 2 turnos previos"
       - "`history` con 3 o 4 turnos previos, y la respuesta depende de algo dicho en ellos"
+    uses:  # The generator leans to sending and creating; half the batches consult instead (did X reply, what is urgent).
+      - "si hace falta una herramienta, es para consultar: leer correos recibidos (quién contestó, qué llegó, qué es urgente), ver la agenda o huecos libres, buscar o leer un archivo, consultar datos"
+      - "si hace falta una herramienta, es para actuar: enviar o responder correos, crear, mover o cancelar eventos, guardar o editar archivos, actualizar registros"
     style:
       - como escribe la gente con prisa, sin acentos y con alguna falta de ortografía
       - formal y cortés
@@ -121,6 +124,7 @@ generation:
     - Mensajes {length}.
     - {turns}. Los turnos van en líneas separadas, con el formato «Usuario: …» y «Asistente: …».
     - Estilo: {style}.
+    - Uso: {uses}.
 
     Reglas:
     - Una herramienta «no» no puede hacer falta, aunque el mensaje toque temas cercanos: hablar de un correo cuyo texto ya está en la conversación no necesita el correo; opinar sobre una reunión ya descrita no necesita el calendario; un dato que el asistente ya dio en `history` no se vuelve a buscar.
