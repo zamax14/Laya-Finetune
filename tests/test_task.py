@@ -86,9 +86,9 @@ class TaskChecks(unittest.TestCase):
 
     def test_tool_routing_task(self):
         task = Task.load("tool_routing")
-        self.assertEqual(len(task.combos()), 33)  # 31 non-empty tool sets to use, plus asking and answering directly.
+        self.assertEqual(len(task.combos()), 64)  # 31 non-empty tool sets to use, 32 when asking, 1 answering directly.
         self.assertEqual(len(task.test_cases()), 120)
-        self.assertFalse([c for c in task.combos() if c["action"] != "use_tools" and any(v is True for v in c.values())])
+        self.assertFalse([c for c in task.combos() if c["action"] == "answer_directly" and any(v is True for v in c.values())])
 
     def test_readme_example_task_loads(self):
         readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")

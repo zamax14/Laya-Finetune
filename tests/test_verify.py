@@ -54,7 +54,7 @@ class VerifyChecks(unittest.TestCase):
 
     def test_relabel_only_to_a_valid_combination(self):
         case = TASK.test_cases()[0]
-        invalid = {**case["answers"], "action": "ask_user", "email": True}  # Asking the user uses no tool.
+        invalid = {**case["answers"], "action": "answer_directly", "email": True}  # Answering directly uses no tool.
         judge = FakeJudge({case["fields"]["message"]: invalid})
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "r.jsonl"
