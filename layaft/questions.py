@@ -89,6 +89,11 @@ class Question:
         """Words that give the answer away if a generated text contains them."""
         return []
 
+    @staticmethod
+    def graded(records):
+        """The records with a reference: a null one is ambiguous on purpose and never graded."""
+        return [r for r in records if r["expected"] is not None]
+
     def headline(self, summary):
         """(hits, total) for the chart."""
         return summary["correct"], summary["total"]
@@ -139,7 +144,7 @@ class Choice(Question):
         return out
 
     def metrics(self, records):
-        graded = [r for r in records if r["expected"] is not None]  # A null reference is ambiguous on purpose.
+        graded = self.graded(records)
         hits = [r["predicted"] == r["expected"] for r in graded]
         out = {"correct": sum(hits), "total": len(graded), "ece": ece([r["confidence"] / 100 for r in graded], hits)}
         if self.review:
@@ -188,8 +193,8 @@ class Score(Question):
         return {**super().record(answer, expected), "score": round(answer["score"], 2)}
 
     def metrics(self, records):
-        distance = [abs(self.index(r["predicted"]) - self.index(r["expected"])) for r in records]
-        return {"correct": distance.count(0), "near": sum(d <= 1 for d in distance), "total": len(records)}
+        distance = [abs(self.index(r["predicted"]) - self.index(r["expected"])) for r in self.graded(records)]
+        return {"correct": distance.count(0), "near": sum(d <= 1 for d in distance), "total": len(distance)}
 
     def display(self, s):
         return [(f"{self.name} exact", f"{s['correct']}/{s['total']}"), (f"{self.name} ±1", f"{s['near']}/{s['total']}")]
@@ -220,8 +225,9 @@ class Noul(Question):
         return {**super().record(answer, expected), "p": round(answer["noul"], 3)}
 
     def metrics(self, records):
-        return {"correct": sum(r["predicted"] == r["expected"] for r in records), "total": len(records),
-                "brier": round(statistics.fmean((r["p"] - r["expected"]) ** 2 for r in records), 3)}
+        graded = self.graded(records)
+        return {"correct": sum(r["predicted"] == r["expected"] for r in graded), "total": len(graded),
+                "brier": round(statistics.fmean((r["p"] - r["expected"]) ** 2 for r in graded), 3)}
 
     def display(self, s):
         return [(self.name, f"{s['correct']}/{s['total']}"), (f"{self.name} Brier", s["brier"])]

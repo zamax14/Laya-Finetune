@@ -49,8 +49,11 @@ class QuestionChecks(unittest.TestCase):
         s = SCORE.metrics([SCORE.record({"score": 1.4, "confidence": .5}, "high"),
                            SCORE.record({"score": 0, "confidence": .5}, "high")])
         self.assertEqual((s["correct"], s["near"], s["total"]), (0, 1, 2))
-        n = NOUL.metrics([NOUL.record({"noul": 1.0, "confidence": 1}, True), NOUL.record({"noul": .0, "confidence": 1}, False)])
-        self.assertEqual((n["correct"], n["brier"]), (2, 0))
+        n = NOUL.metrics([NOUL.record({"noul": 1.0, "confidence": 1}, True), NOUL.record({"noul": .0, "confidence": 1}, False),
+                          NOUL.record({"noul": .5, "confidence": .5}, None)])  # Ambiguous: not graded.
+        self.assertEqual((n["correct"], n["total"], n["brier"]), (2, 2, 0))
+        s = SCORE.metrics([SCORE.record({"score": 0, "confidence": .5}, None)])
+        self.assertEqual(s["total"], 0)
 
     def test_light_thresholds_and_describe(self):
         self.assertEqual([CHOICE.light(c) for c in (100, 80.1, 80, 60, 59.9)], ["green", "green", "yellow", "yellow", "red"])
