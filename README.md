@@ -212,8 +212,9 @@ Triton, which needs the Python headers (`Python.h`, from Python's include direct
 | 32k | `train ctx=32k` (YaRN ×4) | needs more than 6 GB: see the DGX |
 | 64k | `train ctx=64k` (YaRN ×8), experimental | |
 
-Train the ladder in order, each stage from the previous checkpoint:
-`layaft train model=runs/helpdesk-8k ctx=16k profile=full`.
+Every long stage can start from the short fine-tuned checkpoint, because it trains on the short cases plus long copies
+of every length up to `ctx`. So the stages run in parallel, one GPU each:
+`layaft train model=runs/helpdesk-1k ctx=16k profile=full`.
 
 ## On a Slurm cluster
 
@@ -225,7 +226,7 @@ the same calls from Python (commented out, same result). Nothing is installed ou
 |---|---|---|
 | `generate.sh` | cases and filler from the node's Ollama daemon | none from Slurm (the daemon has its own) |
 | `verify.sh` | two judges, then `data/<task>_train.jsonl` | none from Slurm |
-| `train_1k.sh`, `train_8k.sh`, `train_32k.sh` | one context stage from the previous one, plus its `val` | 1 |
+| `train_1k.sh`, `train_8k.sh`, `train_32k.sh` | one context stage (8k and 32k both start from 1k, in parallel), plus its `val` | 1 |
 | `val.sh` | Laya as shipped, the reference | 1 |
 
 [`slurm/pipeline.sh`](slurm/pipeline.sh) queues them all at once with `--dependency=afterok`: each job starts when

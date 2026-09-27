@@ -28,14 +28,15 @@ fi
 export CPATH=$PWD/.venv/python-headers/usr/include/python3.12:$PWD/.venv/python-headers/usr/include
 
 # Option 1: command line
-# 32k from the 8k stage: YaRN ×4 on the global-attention layers
-layaft train task=tool_routing model=runs/tool_routing-8k profile=full teacher=none data=data/tool_routing_train.jsonl ctx=32k long=2000 out=runs/tool_routing-32k
+# 32k from the 1k stage, at the same time as 8k: YaRN ×4 on the global-attention layers, trained on short
+# cases and long copies of every length up to 32k
+layaft train task=tool_routing model=runs/tool_routing-1k profile=full teacher=none data=data/tool_routing_train.jsonl ctx=32k long=2000 out=runs/tool_routing-32k
 layaft val task=tool_routing model=runs/tool_routing-32k ctx=32k
 
 # Option 2: the same from Python
 # python - <<'EOF'
 # from layaft import LayaFT
-# model = LayaFT("runs/tool_routing-8k")
+# model = LayaFT("runs/tool_routing-1k")
 # model.train(task="tool_routing", profile="full", teacher="none", data="data/tool_routing_train.jsonl", ctx="32k", long=2000, out="runs/tool_routing-32k")
 # model.val(task="tool_routing", ctx="32k")
 # EOF
