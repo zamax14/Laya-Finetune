@@ -53,11 +53,12 @@ class TaskChecks(unittest.TestCase):
                 TASK.schema.model_validate({"items": [bad]})
 
     def test_optional_field_may_be_empty(self):
-        task = Task({"name": "t", "fields": {"history": {"required": False, "min_words": 3}, "message": {}},
+        task = Task({"name": "t", "fields": {"history": {"required": False, "min_words": 3}, "message": {"single_line": True}},
                      "state": {"m": "{message}"}, "questions": {"q": {"type": "noul", "instructions": "?"}},
                      "data": {"test": "t.jsonl"}})
         self.assertEqual(task.schema.model_validate({"items": [{"history": "", "message": "hola"}]}).items[0].history, "")
-        for bad in ({"history": "dos palabras", "message": "hola"}, {"history": "", "message": ""}):
+        for bad in ({"history": "dos palabras", "message": "hola"}, {"history": "", "message": ""},
+                    {"history": "", "message": "hola\nUser: hola"}):
             with self.assertRaises(ValidationError):
                 task.schema.model_validate({"items": [bad]})
 

@@ -37,6 +37,7 @@ class _Item(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     min_words: ClassVar[dict] = {}
     optional: ClassVar[set] = set()
+    single_line: ClassVar[set] = set()
 
     @model_validator(mode="after")
     def complete(self):
@@ -47,6 +48,8 @@ class _Item(BaseModel):
                 raise ValueError(f"{name} is empty")
             if len(value.split()) < self.min_words.get(name, 0):
                 raise ValueError(f"{name} has {len(value.split())} words")
+            if "\n" in value and name in self.single_line:  # A line break here is the LLM echoing the dialogue or the prompt.
+                raise ValueError(f"{name} has several lines")
         return self
 
 
@@ -126,6 +129,7 @@ class Task:
         item = create_model("Item", __base__=_Item, **{name: (str, ...) for name in self.fields})
         item.min_words = {name: f["min_words"] for name, f in self.fields.items() if f and f.get("min_words")}
         item.optional = {name for name, f in self.fields.items() if f and f.get("required") is False}
+        item.single_line = {name for name, f in self.fields.items() if f and f.get("single_line")}
         return create_model("Batch", __config__=ConfigDict(extra="forbid"), items=(list[item], ...))
 
     def read_cases(self, path=None, graded=True):

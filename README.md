@@ -57,7 +57,7 @@ Generating data needs no GPU. Training and evaluation need an NVIDIA GPU; the `t
 
 ```yaml
 name: invoices
-fields: {vendor: {}, body: {min_words: 40}}          # what the generator asks the LLM to write ({required: false} may be empty)
+fields: {vendor: {}, body: {min_words: 40}}          # what the LLM writes ({required: false}: may be empty; {single_line: true})
 state: {invoice: "{vendor}: {body}"}                  # what Laya reads
 questions:
   expense_type:
