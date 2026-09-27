@@ -11,8 +11,7 @@ model = LayaFT()
 # plus 400 neutral documents that long-context training wraps around the cases.
 model.generate(task="tool_routing", backend="ollama", llm="qwen3.6:35b", n=150, filler=400, context="all", parallel=8)
 
-# The judge keeps about 1 in 5 "ask the user" cases and fewer multi-tool ones than single-tool: write more of both.
-model.generate(task="tool_routing", backend="ollama", llm="qwen3.6:35b", n=50, context="all", parallel=8,
-               only={"action": ["ask_user"]})
-model.generate(task="tool_routing", backend="ollama", llm="qwen3.6:35b", n=50, context="all", parallel=8,
-               only={"action": ["use_tools"]})
+# The judges keep few "ask the user" and "answer directly" cases, and fewer multi-tool than single-tool: write more.
+for action, n in (("ask_user", 110), ("use_tools", 50), ("answer_directly", 30)):
+    model.generate(task="tool_routing", backend="ollama", llm="qwen3.6:35b", n=n, context="all", parallel=8,
+                   only={"action": [action]})
