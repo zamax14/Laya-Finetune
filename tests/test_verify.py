@@ -60,6 +60,7 @@ class VerifyChecks(unittest.TestCase):
             path = Path(tmp) / "r.jsonl"
             io.append(path, [{**case, "judge": invalid}])
             self.assertEqual([len(x) for x in verify(TASK, judge, path)], [0, 0, 1])
+            self.assertTrue(all(p.exists() for p in outputs(path)))  # All three, even the empty ones.
 
     def test_schema_only_accepts_valid_keys(self):
         schema = judge_schema(TASK).model_json_schema()

@@ -48,6 +48,8 @@ def verify(task, llm, path=None):
     Returns (kept, relabelled, rejected)."""
     path = path or task.train_path
     kept_path, relabelled_path, rejected_path = outputs(path)
+    for output in outputs(path):  # Even if empty: the next step concatenates them.
+        io.append(output, [])
     done = {c["id"] for c in io.read(kept_path) + io.read(relabelled_path) + io.read(rejected_path)}
     valid = [json.dumps(c, sort_keys=True) for c in task.combos()]
     cases = [c for c in task.read_cases(path) if c["id"] not in done]
