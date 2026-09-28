@@ -17,7 +17,7 @@ class TeacherChecks(unittest.TestCase):
         with mock.patch.object(teachers.config, "secret", side_effect=lambda env, f=None: "k" if env == "TYPESAFE_API_KEY" else None), \
                 mock.patch("layaft.teachers.post", return_value=reply) as post:
             jev = teachers.create_teacher("jev")
-            answers = jev.ask({"ticket": "x"}, task)
+            answers = jev.ask({"ticket": "x"}, task.laya, task)
         self.assertEqual(post.call_args.args[0], "https://api.typesafe.ai/v1/systemone")
         self.assertEqual(post.call_args.args[1]["questions"], task.laya)
         self.assertEqual(answers["categoria"]["probabilities"]["hardware"], 0)

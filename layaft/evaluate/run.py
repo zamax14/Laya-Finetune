@@ -15,7 +15,7 @@ def evaluate(agent, cases, task):
     rows = []
     for case in cases:
         started = time.perf_counter()
-        answers = agent.predict(task.state(case), task.laya)["answers"]
+        answers = agent.predict(task.state(case), task.laya_for(case))["answers"]
         rows.append({"id": case["id"], "title": task.title(case), "latency_ms": round(1000 * (time.perf_counter() - started), 1),
                      "answers": {qid: q.record(answers[qid], case["answers"].get(qid)) for qid, q in task.questions.items()}})
     return summarize(task, rows), rows

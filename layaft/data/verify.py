@@ -51,12 +51,13 @@ def verify(task, llm, path=None):
     done = {c["id"] for c in io.read(kept_path) + io.read(relabelled_path) + io.read(rejected_path)}
     valid = [json.dumps(c, sort_keys=True) for c in task.combos()]
     cases = [c for c in task.read_cases(path) if c["id"] not in done]
-    model, questions = judge_schema(task), json.dumps(task.laya, ensure_ascii=False, indent=1)
+    model = judge_schema(task)
     schema = model.model_json_schema()
     llm.temperature = 0.0  # ponytail: only Ollama reads it; an OpenAI-compatible judge keeps its provider's default.
 
     def one(case):
         state = json.dumps(task.state(case), ensure_ascii=False, indent=1)
+        questions = json.dumps(task.laya_for(case), ensure_ascii=False, indent=1)
         try:
             content, _ = llm(PROMPT.format(state=state, questions=questions), schema)
             return case, model.model_validate_json(content).model_dump()

@@ -62,6 +62,23 @@ class TaskChecks(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 task.schema.model_validate({"items": [bad]})
 
+    def test_templated_question_takes_each_case_fields(self):
+        task = Task({"name": "t", "fields": {"request": {}, "name": {}, "description": {}},
+                     "state": {"request": "{request}"},
+                     "questions": {"needed": {"type": "noul", "instructions": "Is «{name}»: {description} useful?"},
+                                   "urgent": {"type": "noul", "instructions": "Is it urgent?"}},
+                     "generation": {"text_field": "request", "id_fields": ["request", "name"]},
+                     "data": {"test": "t.jsonl"}})
+        case = {"fields": {"request": "haz commit", "name": "git-commits", "description": "commit rules"}}
+        self.assertEqual(task.templated, {"needed"})
+        self.assertEqual(task.laya_for(case)["needed"]["instructions"], "Is «git-commits»: commit rules useful?")
+        self.assertEqual(task.laya_for(case)["urgent"]["instructions"], "Is it urgent?")
+        with self.assertRaises(ValueError):
+            task.laya
+        other = {"fields": {**case["fields"], "name": "find-docs"}}  # Same request, another candidate: another case.
+        self.assertNotEqual(task.case_id(case["fields"]), task.case_id(other["fields"]))
+        self.assertNotEqual(task.fingerprint([case]), task.fingerprint([other]))
+
     def test_case_id_is_stable(self):
         # The same hash as the first generator (title + description), so the teacher's cache keeps working.
         self.assertEqual(TASK.case_id({"titulo": "VPN", "descripcion": "caída"}),

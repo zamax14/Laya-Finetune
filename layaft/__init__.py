@@ -95,12 +95,14 @@ class LayaFT:
             print("Saved in", path)
         return out
 
-    def predict(self, state, task, ctx=None, device="cuda"):
-        """Typed answers for one state (a string or a dict), with the task's questions."""
+    def predict(self, state, task, ctx=None, device="cuda", fields=None):
+        """Typed answers for one state (a string or a dict), with the task's questions; `fields` fills the templated
+        ones, e.g. {"name": "git-commits", ...} for a question on one candidate."""
         from layaft.model.load import load
         if getattr(self, "_loaded", (None,))[0] != self.model:  # Reloaded after train/extend change the model.
             self._loaded = (self.model, load(self.model, device, _ctx(ctx)))
-        return self._loaded[1].predict(state, _task(task).laya)["answers"]
+        task = _task(task)
+        return self._loaded[1].predict(state, task.laya_for({"fields": fields or {}}))["answers"]
 
     def extend(self, ctx, out=None):
         """A copy of the checkpoint with room for ctx tokens (YaRN); train it with `train(ctx=...)`."""

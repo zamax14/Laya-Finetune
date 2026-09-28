@@ -49,7 +49,7 @@ class Trainer:
         out = []
         for case in cases:
             goal = targets(task, case, teacher)
-            for qid, question in task.laya.items():
+            for qid, question in task.laya_for(case).items():
                 internal = self.agent._to_internal(question)
                 ids, markers = build_sequence(self.agent.tok, task.state(case), internal,
                                               self.agent.cfg["max_len"], self.agent.cfg["head_max_len"])

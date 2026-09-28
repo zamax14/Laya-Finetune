@@ -161,12 +161,13 @@ class TrainPipeline:
         (out / "results.json").write_text(json.dumps(report_data, ensure_ascii=False, indent=2))
         shutil.rmtree(out / "extended", ignore_errors=True)
         # Check: the saved checkpoint loads with Laya and decides like the model in memory.
-        state = self.task.state(self.task.test_cases()[0])
-        qid = next(iter(self.task.laya))
-        a = agent.predict(state, self.task.laya)["answers"][qid]
+        case = self.task.test_cases()[0]
+        state, questions = self.task.state(case), self.task.laya_for(case)
+        qid = next(iter(questions))
+        a = agent.predict(state, questions)["answers"][qid]
         agent.model.to("cpu")  # Two copies on the GPU would pass the test profile's cap.
         torch.cuda.empty_cache()
-        b = load(out, device="cuda").predict(state, self.task.laya)["answers"][qid]
+        b = load(out, device="cuda").predict(state, questions)["answers"][qid]
         assert a == b, f"The reloaded checkpoint decides differently: {a} against {b}"
         print("Saved in", out, "and checked by reloading it")
         return out

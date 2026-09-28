@@ -36,8 +36,8 @@ class JevTeacher:
             self.url, self.key, self.model = f"{OPENROUTER}/systemone", openrouter, "typesafe/jev-1.13"
         self.cost = 0.0
 
-    def ask(self, state, task):
-        body = post(self.url, {"model": self.model, "state": state, "questions": task.laya}, self.key)
+    def ask(self, state, questions, task):
+        body = post(self.url, {"model": self.model, "state": state, "questions": questions}, self.key)
         usage = body.get("usage") or {}
         self.cost += float(usage.get("cost") or (usage.get("input_tokens") or 0) * JEV_PRICE / 1e6)
         answers = body.get("answers") or {}
@@ -56,7 +56,7 @@ class JevTeacher:
 
         def one(case):
             try:
-                return case["id"], self.ask(task.state(case), task)
+                return case["id"], self.ask(task.state(case), task.laya_for(case), task)
             except Exception as exc:
                 print(case["id"], "failed:", exc, flush=True)
                 return case["id"], None

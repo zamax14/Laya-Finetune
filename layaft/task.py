@@ -22,6 +22,7 @@ import hashlib
 import itertools
 import json
 from functools import cached_property
+from string import Formatter
 from pathlib import Path
 from typing import ClassVar
 
@@ -62,6 +63,8 @@ class Task:
         gen = spec.get("generation", {})
         self.title_field = gen.get("title_field")  # Titles must not repeat; with the text they make the case id.
         self.text_field = gen.get("text_field", next(iter(self.fields)))  # Checked for leaks.
+        # The fields hashed into a case's id: one text paired with several candidates needs the candidate's too.
+        self.id_fields = gen.get("id_fields") or [f for f in (self.title_field, self.text_field) if f]
         self.leak_phrases = [p.lower() for p in gen.get("leak_phrases", [])]
         self.prompt = gen.get("prompt")
         self.default_context = gen.get("default_context", f"texts for the task {self.name}")
@@ -71,6 +74,9 @@ class Task:
         self.filler_path = self.root / data["filler"] if "filler" in data else config.DATA / f"{self.name}_filler.jsonl"
         self.test_path = self.root / data["test"]
         self.teacher_path = config.DATA / f"{self.name}_teacher.jsonl"  # The teacher's answers, a cache.
+        # Questions whose instructions name a field, e.g. "Is `{name}` useful?": filled per case by `laya_for`.
+        self.templated = {qid for qid, q in self.questions.items()
+                          if any(name in self.fields for _, name, _, _ in Formatter().parse(q.instructions) if name)}
         clash = set(self.fields) & set(self.questions)
         if clash:
             raise ValueError(f"task {self.name}: {sorted(clash)} is both a field and a question")
@@ -89,7 +95,16 @@ class Task:
     @cached_property
     def laya(self):
         """The questions in Laya's format, ready for `agent.predict(state, task.laya)`."""
+        if self.templated:
+            raise ValueError(f"task {self.name}: {sorted(self.templated)} take fields of each case, use laya_for(case)")
         return {qid: q.laya() for qid, q in self.questions.items()}
+
+    def laya_for(self, case):
+        """The questions for one case: a templated question gets the case's fields in its instructions."""
+        if not self.templated:
+            return self.laya
+        return {qid: {**q.laya(), "instructions": q.instructions.format(**case["fields"])} if qid in self.templated
+                else q.laya() for qid, q in self.questions.items()}
 
     def combos(self):
         """Every combination of answers, minus the `exclude` rules (e.g. a low priority never blocks)."""
@@ -117,7 +132,7 @@ class Task:
                 **({"attachments": padding["after"]} if padding.get("after") else {})}
 
     def case_id(self, fields):
-        text = (fields.get(self.title_field, "") if self.title_field else "") + fields[self.text_field]
+        text = "".join(fields.get(f, "") for f in self.id_fields)
         return hashlib.sha1(text.encode()).hexdigest()[:12]
 
     def title(self, case):
@@ -167,7 +182,8 @@ class Task:
 
     def fingerprint(self, cases):
         """Two evaluations with the same fingerprint measured the same questions on the same cases."""
-        data = json.dumps([cases, self.laya], ensure_ascii=False, sort_keys=True, default=str)
+        questions = [self.laya_for(c) for c in cases] if self.templated else self.laya
+        data = json.dumps([cases, questions], ensure_ascii=False, sort_keys=True, default=str)
         return hashlib.sha256(data.encode()).hexdigest()[:12]
 
 
