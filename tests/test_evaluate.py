@@ -8,8 +8,9 @@ from types import SimpleNamespace
 from layaft.data.compose import LongStateBuilder
 from layaft.evaluate import report, run
 from layaft.task import Task
+from tests import HELPDESK
 
-TASK = Task.load("helpdesk")
+TASK = Task.load(HELPDESK)
 LEVELS = TASK.questions["prioridad"].keys
 
 

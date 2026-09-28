@@ -10,8 +10,9 @@ from layaft.task import Task
 from layaft.train import pipeline
 from layaft.train.calibrate import calibrate
 from layaft.train.rlcd import batches, targets
+from tests import HELPDESK
 
-TASK = Task.load("helpdesk")
+TASK = Task.load(HELPDESK)
 
 
 def case(i, categoria="redes", prioridad="alta", bloqueo=True):

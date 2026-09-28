@@ -8,8 +8,9 @@ from pathlib import Path
 from layaft.data import generate as gen
 from layaft.data import io
 from layaft.task import Task
+from tests import HELPDESK
 
-TASK = Task.load("helpdesk")
+TASK = Task.load(HELPDESK)
 WORDS = " ".join(["palabra"] * 30)
 
 

@@ -48,11 +48,11 @@ class BackendChecks(unittest.TestCase):
             client = client_cls.return_value
             client.list.return_value.models = [mock.Mock(model="qwen3.8:latest")]
             client.chat.return_value.message.content = '{"items": []}'
-            llm = create_backend("ollama", model="qwen3.8:latest", ollama_url="http://dgx:11434")
+            llm = create_backend("ollama", model="qwen3.8:latest", ollama_url="http://gpu-server:11434")
             self.assertEqual(llm("hola", {"type": "object"}), ('{"items": []}', 0.0))
             with self.assertRaises(ValueError):  # A missing model is an error, not a download on a shared server.
                 create_backend("ollama", model="gemma3:12b")
-        client_cls.assert_any_call(host="http://dgx:11434", timeout=600)
+        client_cls.assert_any_call(host="http://gpu-server:11434", timeout=600)
         client.pull.assert_not_called()
         self.assertEqual(client.chat.call_args.kwargs["format"], {"type": "object"})
         self.assertFalse(client.chat.call_args.kwargs["think"])

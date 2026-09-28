@@ -5,8 +5,9 @@ import unittest
 
 from layaft.data.compose import LongStateBuilder
 from layaft.task import Task
+from tests import HELPDESK
 
-TASK = Task.load("helpdesk")
+TASK = Task.load(HELPDESK)
 count = lambda text: len(text.split())  # Words stand in for tokens.
 FILLERS = [" ".join(f"doc{i}w{j}" for j in range(200)) for i in range(10)]
 

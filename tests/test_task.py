@@ -1,4 +1,4 @@
-"""The helpdesk task and its 20 test tickets."""
+"""The helpdesk fixture task and its 20 test tickets."""
 import hashlib
 import json
 import re
@@ -11,8 +11,9 @@ import yaml
 from pydantic import ValidationError
 
 from layaft.task import Task
+from tests import HELPDESK
 
-TASK = Task.load("helpdesk")
+TASK = Task.load(HELPDESK)
 
 
 class TaskChecks(unittest.TestCase):
@@ -101,29 +102,6 @@ class TaskChecks(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, f"cases.jsonl:2: .*{message}"):
                     TASK.read_cases(path)
             self.assertEqual(TASK.read_cases(Path(tmp) / "missing.jsonl"), [])
-
-    def test_tool_routing_task(self):
-        task = Task.load("tool_routing")
-        self.assertEqual(len(task.combos()), 64)  # 31 non-empty tool sets to use, 32 when asking, 1 answering directly.
-        self.assertEqual(len(task.test_cases()), 120)
-        self.assertFalse([c for c in task.combos() if c["action"] == "answer_directly" and any(v is True for v in c.values())])
-
-    def test_context_prefilter_asks_claude_decides_question(self):
-        task = Task.load("context_prefilter")
-        claude_decide = "Is this Claude Code {tipo} useful for handling the user's request? {tipo} «{nombre}»: {descripcion}"
-        item = {"type": "skill", "name": "find-docs", "description": "Library docs."}
-        case = {"fields": {"request": "sintaxis de useEffect", "step": "", **item}}
-        self.assertEqual(task.laya_for(case)["needed"]["instructions"],
-                         claude_decide.format(tipo="skill", nombre="find-docs", descripcion="Library docs."))
-        self.assertEqual(task.state(case), {"request": "sintaxis de useEffect", "step": ""})
-        self.assertEqual(task.written_fields, ["request", "step"])
-        self.assertEqual(len(task.contexts()), 30)
-
-    def test_readme_example_task_loads(self):
-        readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
-        task = Task(yaml.safe_load(re.search(r"```yaml\n(name: invoices.*?)```", readme, re.S).group(1)))
-        self.assertEqual(len(task.combos()), 9)  # 3 × 2 × 2, minus the 3 with high urgency and duplicate: true.
-        self.assertEqual(task.questions["expense_type"].options["travel"].signals, "a booking, a route or a stay")
 
 
 if __name__ == "__main__":

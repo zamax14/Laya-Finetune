@@ -5,11 +5,12 @@ from unittest import mock
 
 from layaft import teachers
 from layaft.task import Task
+from tests import HELPDESK
 
 
 class TeacherChecks(unittest.TestCase):
     def test_jev_normalizes_and_prices_typesafe_answers(self):
-        task = Task.load("helpdesk")
+        task = Task.load(HELPDESK)
         reply = {"answers": {"categoria": {"choice": "redes", "confidence": .8,
                                            "probabilities": {"redes": .8, "software": .2}},
                              "prioridad": {"score": 2.0, "probabilities": {"2": 1}}, "bloqueo": {"noul": 1.0}},
