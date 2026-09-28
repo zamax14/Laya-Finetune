@@ -1,0 +1,115 @@
+# IT helpdesk triage: the task this repo started with, and the case study in the README.
+# Question ids, option keys and criteria are the ones every v1–v4 checkpoint was trained on: Laya reads the option
+# keys as text, and the Jev teacher cache is keyed by them. Short, keyword-style criteria in English measured better
+# than long ones with tie-break rules (13/19 against 10/19 on the category); the rich detail belongs in the ticket.
+
+name: helpdesk
+
+# Fields of a case. The generator asks the LLM for exactly these; `min_words` rejects thin texts and `choices` fills
+# the {area} placeholder of the prompt with a random `sample` of them.
+fields:
+  titulo: {}
+  solicitante: {}
+  area:
+    choices: [Finanzas, Ventas, Marketing, Operaciones, Logística, Recursos Humanos, Dirección, Compras,
+              Atención al cliente, Legal, Producción, Almacén]
+    sample: 4
+  descripcion: {min_words: 25}  # The prompt asks for 50–130 words; under 25 there is no context.
+
+# What Laya reads: each key is a state field that the question instructions can name with `backticks`.
+state:
+  ticket: "{titulo}. {descripcion} (Solicitante: {solicitante}, área de {area}.)"
+
+questions:
+  categoria:
+    type: choice
+    name: Category
+    instructions: >-
+      Which IT support team should handle the problem described in the `ticket`?
+      Focus on the cause the requester describes, not on every system they mention.
+    review: {green: 80, yellow: 60}  # Traffic light: green is assigned alone, yellow a person confirms, red a person decides.
+    options:
+      hardware:
+        label: Hardware
+        criteria: "hardware: laptops, screens, printers, peripherals, buying equipment"
+        signals: "síntomas de un equipo físico: no enciende, se daña, falla un periférico o una impresora, o hay que comprar o reemplazar equipo"
+      software:
+        label: Software
+        criteria: "software: business apps (ERP, CRM), installing programs, licenses, app errors"
+        signals: una aplicación concreta que da un error, se cierra, no se instala o necesita licencia, mientras la conexión funciona
+      redes:
+        label: Redes
+        criteria: "network: wifi, VPN, internet, slow or down network, offices offline"
+        signals: "fallas de conexión: wifi, cable, VPN o internet caídos o lentos, que afectan a varios servicios o personas del mismo lugar"
+      accesos:
+        label: Accesos
+        criteria: "access: passwords, locked account, new users, folder permissions"
+        signals: "un problema rutinario de identidad: contraseña olvidada o vencida, cuenta bloqueada por intentos, alta de usuario o permiso denegado a una carpeta o sistema"
+      correo:
+        label: Correo y colaboración
+        criteria: "email and collaboration: Outlook, missing emails, calendars, Teams calls"
+        signals: "fallas del correo, el calendario o las videollamadas: mensajes que no llegan o no salen, calendarios que no sincronizan, llamadas que se cortan"
+      seguridad:
+        label: Seguridad
+        criteria: "security: phishing, viruses, trojans, unauthorized account use, fraud"
+        signals: "una amenaza concreta: un correo o mensaje que pide credenciales o trae un enlace o adjunto sospechoso, una alerta del antivirus, un archivo malicioso, o un acceso, cambio o transacción que la persona no reconoce"
+  prioridad:
+    type: score  # Lowest first: it is a scale, so Laya scores it and the evaluation rounds to the nearest level.
+    name: Priority
+    instructions: How urgent and impactful is the `ticket`?
+    levels:
+      baja:
+        label: Baja
+        criteria: "low: optional improvement, cosmetic defect or planned purchase; a usable workaround exists and no near deadline is stated"
+      media:
+        label: Media
+        criteria: "medium: one person or team is inconvenienced, but the core task can continue; routine access or onboarding request with time to prepare"
+      alta:
+        label: Alta
+        criteria: "high: one person cannot perform essential work, a deadline is imminent, customer work is being lost, or a credible security warning needs prompt investigation"
+      critica:
+        label: Crítica
+        criteria: "critical: many people or a key business process is stopped, or malware, unauthorized access or fraud may be active; immediate coordinated response"
+  bloqueo:
+    type: noul
+    name: Blocking
+    instructions: >-
+      Is at least one person unable to do their essential work right now because of the problem in the `ticket`?
+      Answer yes only if work is stopped, not merely slower or inconvenient, and no workaround lets them continue.
+    words: {true: sí, false: "no"}  # How the generator's prompt says the answer.
+
+# Low and medium never block; high and critical may or may not (a fraud is critical even if nobody stops working).
+exclude:
+  - {prioridad: [baja, media], bloqueo: true}
+
+generation:
+  title_field: titulo
+  text_field: descripcion
+  per_call: 5
+  contexts: helpdesk_contexts.txt  # 48 sectors and countries; `context=` replaces them with one.
+  default_context: tickets de la mesa de ayuda de una empresa mediana
+  leak_phrases: [no es un, no se trata de, no hay indicios, corresponde a, categoría]
+  # Placeholders: {n}, {context}, {seen}, each question as {id.label} {id.criteria} {id.signals}, and each field with
+  # choices by its name. Without `prompt`, a generic English one lists the answers.
+  prompt: |-
+    Escribe {n} textos distintos entre sí, en español, dirigidos al soporte de TI de una organización.
+    Contexto: {context}
+
+    Todos corresponden a esta situación:
+    - Equipo que debe atenderlo: {categoria.label} ({categoria.criteria}).
+    - Prioridad: {prioridad.label} ({prioridad.criteria}).
+    - ¿Alguien no puede hacer su trabajo esencial ahora mismo, sin alternativa?: {bloqueo.label}.
+
+    Reglas:
+    - Escríbelos como quien los envía, de 50 a 130 palabras. Varía la longitud, el tono y el nivel de detalle.
+    - Da contexto concreto: desde cuándo, qué equipo o sistema, mensajes de error literales si los hay, qué se probó, a cuántas personas afecta, plazos e impacto.
+    - Los hechos del texto deben bastar para que un técnico elija ese equipo sin dudar: tienen que aparecer {categoria.signals}.
+    - No nombres el equipo que debe atenderlo ni la categoría, y no hagas comentarios que den la respuesta («no es un fallo de…», «no hay indicios de…», «corresponde a…»).
+    - A veces menciona otros sistemas que siguen funcionando o que se ven afectados sin ser la causa, como pasa en la vida real.
+    - Área del solicitante: una de {area}. Inventa nombres y apellidos hispanos variados.
+    - Situaciones distintas de estas, que ya existen: {seen}.
+
+data:
+  # Hand-written, with real details and no hints of the answer; never trained on. T-1020 is ambiguous on purpose
+  # (category null): it should come out red. Training data and filler use the defaults: data/helpdesk*.jsonl.
+  test: helpdesk_test.jsonl
