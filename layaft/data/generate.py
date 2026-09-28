@@ -46,7 +46,7 @@ def leaks(task, text, combo):
         term in text for qid, value in combo.items() for term in task.questions[qid].leak_terms(value))
 
 
-def prompt_for(task, combo, context, seen, rng, count):
+def prompt_for(task, combo, context, seen, rng, count, row=None):
     values = {qid: task.questions[qid].describe(value) for qid, value in combo.items()}
     samples = {name: ", ".join(rng.sample(f["choices"], f.get("sample", len(f["choices"]))))
                for name, f in task.fields.items() if f and f.get("choices")}
@@ -55,8 +55,10 @@ def prompt_for(task, combo, context, seen, rng, count):
     choices = "".join(f" For {name}, one of: {s}." for name, s in samples.items())
     # `generation.vary`: one option of each list per call, e.g. {length: ["short", "long"]} → {length} in the prompt.
     picks = {name: rng.choice(options) for name, options in task.spec.get("generation", {}).get("vary", {}).items()}
+    drawn = {name: (row or {})[name] for name in task.pool_fields}  # A pool row's fields, e.g. {name} of a catalog item.
     return (task.prompt or PROMPT).format(n=count, context=context, seen="; ".join(seen[-30:]) or "—", answers=answers,
-                                          fields=", ".join(task.fields), choices=choices, **values, **samples, **picks)
+                                          fields=", ".join(task.written_fields), choices=choices, **values, **samples,
+                                          **picks, **drawn)
 
 
 def parse(content, model):
@@ -89,8 +91,10 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
         for _ in range(3 * -(-per_combo // task.per_call)):  # Room for the dropped ones.
             if len(rows) >= per_combo:
                 break
+            row = rng.choice(task.pool_rows) if task.pool_fields else {}
             try:
-                content, spent = llm(prompt_for(task, combo, context, seen, rng, min(task.per_call, per_combo - len(rows))), schema)
+                prompt = prompt_for(task, combo, context, seen, rng, min(task.per_call, per_combo - len(rows)), row)
+                content, spent = llm(prompt, schema)
                 cost += spent
                 batch = parse(content, task.schema)
             except ValidationError as exc:
@@ -100,6 +104,7 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
                 print(f"{combo}: {type(exc).__name__}: {exc}", flush=True)
                 continue
             for fields in batch:
+                fields = {**fields, **{name: row[name] for name in task.pool_fields}}
                 title = norm(fields.get(task.title_field) or fields[task.text_field][:60])
                 if title in taken or title in map(norm, seen) or leaks(task, fields[task.text_field], combo):
                     continue

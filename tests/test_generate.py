@@ -69,6 +69,35 @@ class GenerateChecks(unittest.TestCase):
         share = sum(r["answers"]["categoria"] == "seguridad" for r in rows) / len(rows)
         self.assertAlmostEqual(share, 4 / 9, delta=0.05)  # Weight 4 against 1 for each of the other 5 categories.
 
+    def test_pool_fields_come_from_the_file_and_the_llm_writes_the_rest(self):
+        class RequestLLM(FakeLLM):
+            prompts = []
+
+            def __call__(self, prompt, schema):
+                self.prompts.append(prompt)
+                assert list(schema["$defs"]["Item"]["properties"]) == ["request"]
+                return json.dumps({"items": [{"request": f"pedido {len(self.prompts)}-{i}"} for i in range(2)]}), 0.0
+
+        with tempfile.TemporaryDirectory() as tmp:
+            catalog = Path(tmp) / "catalog.jsonl"
+            io.append(catalog, [{"name": "git-commits", "description": "commit rules"},
+                                {"name": "find-docs", "description": "library docs"}])
+            (Path(tmp) / "t.jsonl").write_text("")
+            task = Task({"name": "t", "fields": {"request": {}, "name": {}, "description": {}},
+                         "state": {"request": "{request}"},
+                         "questions": {"needed": {"type": "noul", "instructions": "Is «{name}» useful?"}},
+                         "generation": {"text_field": "request", "id_fields": ["request", "name"], "per_call": 2,
+                                        "pool": {"file": "catalog.jsonl", "fields": ["name", "description"]},
+                                        "prompt": "{n} requests where «{name}» ({description}) → {needed.label}"},
+                         "data": {"test": "t.jsonl"}}, tmp)
+            llm = RequestLLM()
+            rows, _ = gen.generate(task, llm, 8, "dev", Path(tmp) / "c.jsonl", seed=5)
+        self.assertEqual(len(rows), 8)
+        for r in rows:  # Each row keeps the item of the prompt that wrote it ("pedido <call>-<i>").
+            prompt = llm.prompts[int(r["fields"]["request"].split()[1].split("-")[0]) - 1]
+            self.assertIn(f"«{r['fields']['name']}» ({r['fields']['description']})", prompt)
+            self.assertEqual(set(r["fields"]), {"request", "name", "description"})
+
     def test_default_prompt_for_a_task_without_one(self):
         task = Task({**TASK.spec, "generation": {**TASK.spec["generation"], "prompt": None}})
         prompt = gen.prompt_for(task, {"categoria": "redes", "prioridad": "alta", "bloqueo": True}, "banco", [],

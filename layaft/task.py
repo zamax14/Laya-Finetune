@@ -63,6 +63,10 @@ class Task:
         gen = spec.get("generation", {})
         self.title_field = gen.get("title_field")  # Titles must not repeat; with the text they make the case id.
         self.text_field = gen.get("text_field", next(iter(self.fields)))  # Checked for leaks.
+        # `pool`: fields drawn from a JSONL file (one row per call) instead of written by the LLM, e.g. a catalog item.
+        pool = gen.get("pool") or {}
+        self.pool_fields = list(pool.get("fields", []))
+        self.pool_path = self.root / pool["file"] if pool else None
         # The fields hashed into a case's id: one text paired with several candidates needs the candidate's too.
         self.id_fields = gen.get("id_fields") or [f for f in (self.title_field, self.text_field) if f]
         self.leak_phrases = [p.lower() for p in gen.get("leak_phrases", [])]
@@ -139,9 +143,18 @@ class Task:
         return case["fields"].get(self.title_field) or case["fields"][self.text_field][:60]
 
     @cached_property
+    def pool_rows(self):
+        return [json.loads(line) for line in self.pool_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    @property
+    def written_fields(self):
+        """The fields the LLM writes: all but the ones drawn from the pool."""
+        return [name for name in self.fields if name not in self.pool_fields]
+
+    @cached_property
     def schema(self):
         """Pydantic model of a generated batch: its JSON Schema constrains the LLM and it validates the reply."""
-        item = create_model("Item", __base__=_Item, **{name: (str, ...) for name in self.fields})
+        item = create_model("Item", __base__=_Item, **{name: (str, ...) for name in self.written_fields})
         item.min_words = {name: f["min_words"] for name, f in self.fields.items() if f and f.get("min_words")}
         item.optional = {name for name, f in self.fields.items() if f and f.get("required") is False}
         item.single_line = {name for name, f in self.fields.items() if f and f.get("single_line")}
