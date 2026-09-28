@@ -108,6 +108,17 @@ class TaskChecks(unittest.TestCase):
         self.assertEqual(len(task.test_cases()), 120)
         self.assertFalse([c for c in task.combos() if c["action"] == "answer_directly" and any(v is True for v in c.values())])
 
+    def test_context_prefilter_asks_claude_decides_question(self):
+        task = Task.load("context_prefilter")
+        claude_decide = "Is this Claude Code {tipo} useful for handling the user's request? {tipo} «{nombre}»: {descripcion}"
+        item = {"type": "skill", "name": "find-docs", "description": "Library docs."}
+        case = {"fields": {"request": "sintaxis de useEffect", "step": "", **item}}
+        self.assertEqual(task.laya_for(case)["needed"]["instructions"],
+                         claude_decide.format(tipo="skill", nombre="find-docs", descripcion="Library docs."))
+        self.assertEqual(task.state(case), {"request": "sintaxis de useEffect", "step": ""})
+        self.assertEqual(task.written_fields, ["request", "step"])
+        self.assertEqual(len(task.contexts()), 30)
+
     def test_readme_example_task_loads(self):
         readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
         task = Task(yaml.safe_load(re.search(r"```yaml\n(name: invoices.*?)```", readme, re.S).group(1)))
