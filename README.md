@@ -13,14 +13,15 @@ in a YAML file, then `generate`, `train` and `val` from one command or one funct
 [![Model: Laya](https://img.shields.io/badge/model-Laya-ffc53d?logo=huggingface&logoColor=black)](https://huggingface.co/convaiinnovations/laya-multilingual)
 [![GPU NVIDIA](https://img.shields.io/badge/GPU-NVIDIA%20·%20CUDA%2013-76b900?logo=nvidia&logoColor=white)](#install)
 [![License MIT](https://img.shields.io/badge/license-MIT-2fbf94)](LICENSE)
+[![Tests](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml/badge.svg)](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml)
 
 </div>
 
 ```bash
-layaft generate task=helpdesk backend=ollama n=216 context=all     # cases labelled by construction
-layaft verify task=helpdesk llm=gemma4:31b                         # a second LLM drops the mislabelled ones
-layaft train task=helpdesk profile=full ctx=16k                    # RLCD + calibration → runs/helpdesk-16k
-layaft val task=helpdesk model=runs/helpdesk-16k ctx=16k           # hand-written test set, by length
+layaft generate task=invoices backend=ollama n=216 context=all     # cases labelled by construction
+layaft verify task=invoices llm=gemma4:31b                         # a second LLM drops the mislabelled ones
+layaft train task=invoices profile=full ctx=16k                    # RLCD + calibration → runs/invoices-16k
+layaft val task=invoices model=runs/invoices-16k ctx=16k           # hand-written test set, by length
 ```
 
 ## Laya and Jev
@@ -39,17 +40,18 @@ calibrated decisions) on synthetic data only. [Laya](https://github.com/NandhaKi
 | Cost | US$0.042 / M input tokens | your GPU | your GPU |
 | Weak spots | — | zero-shot, >20 options, raw calibration, short context | English only |
 
-Zero-shot, Laya lags behind; fine-tuned on its task, it catches up at a fraction of the latency (see the
-[case study](#case-study-it-helpdesk-triage)). This framework closes the other gap: **context**. It extends the
+Zero-shot, Laya lags behind; fine-tuned on its task, it catches up at a fraction of the latency. This framework closes the other gap: **context**. It extends the
 encoder with YaRN and trains it on long states, up to 32k tokens tested and 64k experimental.
 
 ## Install
 
 ```bash
-git clone git@github.com:zamax14/Laya-Finetune.git && cd Laya-Finetune
+git clone https://github.com/zamax14/Laya-Finetune.git && cd Laya-Finetune
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130   # CUDA 13, driver ≥ 580
 ```
+
+Or, without cloning: `pip install git+https://github.com/zamax14/Laya-Finetune --extra-index-url https://download.pytorch.org/whl/cu130`.
 
 Generating data needs no GPU. Training and evaluation need an NVIDIA GPU; the `test` profile fits in 3 GB.
 
@@ -74,12 +76,31 @@ generation: {text_field: body, default_context: supplier invoices of a mid-size 
 data: {test: invoices_test.jsonl}                     # hand-written cases, never trained on (format below)
 ```
 
-The full examples are [`tasks/helpdesk.yaml`](tasks/helpdesk.yaml) and [`tasks/tool_routing.yaml`](tasks/tool_routing.yaml).
-They cover:
+Save it as `tasks/invoices.yaml` in your working directory and `task=invoices` finds it; any other path works too.
+A complete task with most options is the one the tests run on, [`tests/fixtures/helpdesk.yaml`](tests/fixtures/helpdesk.yaml).
+Beyond the basics, a task can declare:
 - the traffic light on confidence (`review`), per-option `signals` and `leak_phrases`;
 - a custom `prompt` in Spanish and a contexts file;
 - `weights`, which follow the real mix of answers instead of one case per combination;
 - `vary`, which draws a random hint per call (length, style, turns) so the texts do not all sound alike.
+
+### One question per candidate
+
+To pick from a catalog that changes (tools, documents, products), ask one yes/no question per item and put the item
+in the question: instructions may name fields, filled from each case (`task.laya_for(case)`).
+
+```yaml
+fields: {request: {single_line: true}, name: {}, description: {}}
+state: {request: "{request}"}
+questions:
+  needed: {type: noul, instructions: "Is «{name}» useful for this request? {description}"}
+generation:
+  pool: {file: catalog.jsonl, fields: [name, description]}  # each call draws an item; the LLM writes only the request
+  id_fields: [request, name]                                 # the same request with another item is another case
+```
+
+`generate` writes requests that need the drawn item; `pair` adds the negatives: the most similar items by embedding
+(to `verify`, since a neighbour may be needed too) and random ones.
 
 ## Dataset format
 
@@ -117,11 +138,11 @@ Each mode has a runnable Python script in [`examples/`](examples) whose docstrin
 from layaft import LayaFT
 
 m = LayaFT("multilingual")
-m.generate(task="helpdesk", backend="openrouter", n=216, context="all")
-m.verify(task="helpdesk", llm="gemma4:31b")             # → data/helpdesk_verified.jsonl
-m.train(task="helpdesk", profile="full", ctx="32k")     # m.model is now runs/helpdesk-32k
-m.val(task="helpdesk", ctx="32k")
-m.predict({"ticket": "La VPN se cae cada hora desde ayer"}, task="helpdesk")
+m.generate(task="invoices", backend="openrouter", n=216, context="all")
+m.verify(task="invoices", llm="gemma4:31b")             # → data/invoices_verified.jsonl
+m.train(task="invoices", profile="full", ctx="32k")     # m.model is now runs/invoices-32k
+m.val(task="invoices", ctx="32k")
+m.predict({"invoice": "Iberia: flight MAD-MEX on 12 May, seat 23C"}, task="invoices")
 ```
 
 | Mode | What it does | Main arguments |
@@ -131,6 +152,7 @@ m.predict({"ticket": "La VPN se cae cada hora desde ayer"}, task="helpdesk")
 | `train` | Teacher, split, RLCD, calibration, comparison, checkpoint in Laya's format under `runs/` | `profile` (`test`/`full`), `ctx`, `epochs`, `teacher` (`jev`/`none`), `long`, `gpu_limit` |
 | `val` | Test-set metrics (per question, and every question right at once), table and chart in `runs/val/<task>-<model>/`; with `ctx`, also by length | `ctx` |
 | `predict` | Typed answers for one state | `state`, `ctx` |
+| `pair` | For one-question-per-candidate tasks: pairs each positive case with similar and random items of the pool, labelled no | `near`, `random`, `data`, `pool`, `embed` |
 | `extend` | Copies a checkpoint with room for `ctx` tokens (no training) | `ctx`, `out` |
 
 ### Data: any LLM
@@ -160,8 +182,7 @@ after every generation round. Train with `data=data/<task>_verified.jsonl`.
 A second judge can re-read the rejected file (`data=data/<task>_rejected.jsonl`). Cases whose label it confirms go to
 `_rejected_verified.jsonl`. If it answers exactly like the first judge, and that answer is a valid combination, the
 case is relabelled with that answer in `_rejected_relabelled.jsonl`. Two models that agree blind make a better label
-than a generator that missed its brief, and these messages are the hard ones. On tool routing, the two judges agreed
-on about 3 in 4 rejected cases.
+than a generator that missed its brief, and these messages are the hard ones.
 
 ### Teacher
 
@@ -188,11 +209,11 @@ cases. The checkpoint loads with the official `laya.load(path)`.
 mmBERT and ModernBERT alternate one global-attention layer with two local ones (a 128-token window), with RoPE and
 positions up to 8,192. The framework grows the context in three steps:
 
-1. **Up to 8k:** the positions already exist, but Laya was only trained up to 1,024 tokens. Handed an 8k email thread
-   with the ticket at the start, the category held but the priority fell by half. `train ctx=8k` trains long states.
+1. **Up to 8k:** the positions already exist, but Laya was only trained up to 1,024 tokens. A model tuned at 1k, handed an
+   8k state with the case at its start, kept some answers and lost half of others. `train ctx=8k` trains long states.
 2. **Beyond 8k:** `extend` applies **YaRN only to the global-attention layers**; the local ones never see more than
    128 positions. The encoder config is rewritten (`rope_type: yarn`, `factor: ctx/8192`), so the checkpoint still
-   loads with `laya.load`. YaRN alone shifts the short answers a little (untrained: category 11/19 against 12/19):
+   loads with `laya.load`. YaRN alone shifts the short answers a little (untrained, one or two test answers in twenty change):
    `train ctx=...` teaches it.
 3. **Long states:** writing thousands of 32k-token documents with an LLM does not scale. `LongStateBuilder` wraps each
    short case, labelled by construction, in neutral filler (resolved threads, notifications, logs: `generate
@@ -209,12 +230,12 @@ Triton, which needs the Python headers (`Python.h`, from Python's include direct
 | 1k | the checkpoint as shipped | ~25 ms |
 | 8k | `train ctx=8k` | 2.1 GB · 1.1 s |
 | 16k | `train ctx=16k` (YaRN ×2) | 2.7 GB · 2.8 s |
-| 32k | `train ctx=32k` (YaRN ×4) | needs more than 6 GB: see the DGX |
+| 32k | `train ctx=32k` (YaRN ×4) | needs more than 6 GB |
 | 64k | `train ctx=64k` (YaRN ×8), experimental | |
 
 Every long stage can start from the short fine-tuned checkpoint, because it trains on the short cases plus long copies
 of every length up to `ctx`. So the stages run in parallel, one GPU each:
-`layaft train model=runs/helpdesk-1k ctx=16k profile=full`.
+`layaft train task=invoices model=runs/invoices-1k ctx=16k profile=full`.
 
 ## On a Slurm cluster
 
@@ -231,53 +252,32 @@ the same calls from Python (commented out, same result). Nothing is installed ou
 
 [`slurm/pipeline.sh`](slurm/pipeline.sh) queues them all at once with `--dependency=afterok`: each job starts when
 the one it needs has finished well, and independent ones run at the same time on other GPUs. Every step keeps its own
-log, and a failed stage stops the ones after it. Run it on the login node:
+log in `logs/`, and a failed stage stops the ones after it. Run it on the login node, from the repo root:
 
 ```bash
-bash slurm/pipeline.sh     # or one step: sbatch --dependency=afterok:<job> slurm/train_8k.sh
+TASK=invoices bash slurm/pipeline.sh     # or one step: sbatch --export=ALL,TASK=invoices slurm/train_8k.sh
 ```
+
+Uncomment `--partition` in each job for your cluster. The Ollama models are variables at the top of `generate.sh`
+(`LLM`) and `verify.sh` (`JUDGE`, `SECOND_JUDGE`), and can be passed the same way as `TASK`.
 
 Generation never pulls models into a shared Ollama server: if `llm=` is not there, it stops and lists the available
 ones.
 
-## Case study: IT helpdesk triage
+## Tips
 
-The task this repo started with ([`tasks/helpdesk.yaml`](tasks/helpdesk.yaml)): a Spanish support ticket enters as
-the state and Laya answers three questions in one pass. **Which team?** is a `choice` among six. **What priority?**
-is a four-level `score`. **Is someone unable to work right now?** is a `noul`. The category's confidence feeds a
-traffic light: green is assigned alone, yellow a person confirms, red a person decides. The **20 test tickets** are
-hand-written, with real details and no hints of the answer, and never trained on.
-
-<img src="docs/evaluacion.svg" alt="Accuracy per question of base Laya and each tuned version on the 20 test tickets" width="880">
-
-| Model | Training cases | Category | Exact priority | Blocking | ECE | Latency |
-|---|---|---|---|---|---|---|
-| Laya base | not tuned | 12/19 | 10/20 | 15/20 | 0.229 | 10 ms |
-| v1 | 720 · gemma3, 1 context | 15/19 | 9/20 | 16/20 | 0.18 | 10 ms |
-| v2 | 1,260 · + 5 sectors and countries | 14/19 | 14/20 | 17/20 | 0.186 | 10 ms |
-| v3 | 1,470 · + 210 security cases with signals | 15/19 | 14/20 | 16/20 | 0.133 | 10 ms |
-| **v4** | 11,837 · + 10,151 from GPT-5.6 Luna, 48 contexts | **17/19** | 12/20 | **19/20** | 0.131 | 10 ms |
-| *Jev 1.13* | *API* | *19/19* | *13/20* | *19/20* | | *366 ms* |
-| *GPT-5.6 Luna* | *API* | *19/19* | *15/20* | *19/20* | | *1,896 ms* |
-
-Generating ~11,800 cases and grading them with Jev cost about **US$3.50**. v4 trained in ~20 minutes (4 epochs) on an
-RTX 4070 Ti SUPER.
-
-**What we learned**
-
-- **Labels by construction need signals.** Asked for a security ticket "without naming the category", gemma3 wrote
-  slow folders and expired licences, with no trace of an attack: Jev rejected 88 of 210. Demanding each category's
-  signals in the prompt raised it to 201 of 210.
-- **A teacher is mostly a filter.** Dropping the cases Jev does not see in their category keeps tickets that do not
-  say what their label says out of training.
-- **More writing styles beat more cases of the same style.** v2 and v3 did not move the category past 15/19; v4 added
-  10,000 cases from another model in 48 contexts and reached 17.
-- **Validation overestimates.** v4 got 1,158 of 1,160 categories right in validation and 17 of 19 on the test set:
-  generated cases resemble each other more than a person's writing. Always measure on hand-written cases.
-- **Short, keyword-style criteria, rich context.** Short criteria beat long ones with tie-break rules (13 against 10
-  of 19); the detail pays off in the state.
-- **Not every local LLM can generate.** `qwen3.5:9b` ignores the schema without reasoning and, reasoning, took 148 s
-  to return nothing; `gemma3:12b` respects it at ~12 tickets per minute.
+- **Labels by construction need signals.** Asked for a text "without naming the answer", an LLM often writes one with
+  no trace of it. Give each option `signals` (the facts that point to it) and the generator puts them in the text.
+- **The judges are mostly a filter.** Dropping the cases a second model does not read as their label keeps texts that
+  do not say what their label says out of training. The relabelled ones are the hard cases: keep them.
+- **More writing styles beat more cases of the same style.** Several generators, contexts and `vary` hints move the
+  test set more than doubling the cases of one model.
+- **Validation overestimates.** Generated cases resemble each other more than a person's writing: validation near 100 %
+  can be 85 % on the test set. Always measure on hand-written cases.
+- **Short, keyword-style criteria, rich states.** Short criteria beat long ones with tie-break rules; the detail pays
+  off in the state.
+- **Not every local LLM can generate.** Some ignore the JSON Schema without reasoning, or reason for minutes and return
+  nothing. Try `generate n=2` before a long run.
 
 ## Structure
 
@@ -285,15 +285,14 @@ RTX 4070 Ti SUPER.
 layaft/
   task.py  questions.py        the task (YAML) and the question types: choice, score, noul
   backends/  teachers.py       LLMs for the generator (Ollama, any OpenAI-compatible API) and the Jev teacher
-  data/                        generation by construction, the judge (verify), long states (LongStateBuilder), JSONL
+  data/                        generation by construction, the judge (verify), negatives (pair), long states, JSONL
   model/                       checkpoint loading, context extension (YaRN)
   train/                       RLCD, calibration, the pipeline
   evaluate/                    metrics per question type and by length, table and chart
   cli.py  __init__.py          `layaft <mode> key=value` and the LayaFT facade
-tasks/       helpdesk.yaml and tool_routing.yaml, with their test sets and contexts
-notebooks/   the three steps, explained
 examples/    one Python script per mode, with its CLI equivalent
 slurm/       one Slurm job per mode
+tests/       unit tests, on the task in tests/fixtures
 ```
 
 ```bash
@@ -304,5 +303,4 @@ python -m unittest discover -s tests -t .    # no network, no GPU
 
 - **[Laya](https://github.com/NandhaKishorM/laya)** by ConvAI Innovations, Apache-2.0, and its fine-tuning recipe.
 - **Jev** by TypeSafe, **GPT** by OpenAI, through [OpenRouter](https://openrouter.ai).
-- Test tickets and contexts drafted with Claude; synthetic tickets with gemma3 and GPT.
 - Code under the [MIT](LICENSE) license.
