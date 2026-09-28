@@ -70,7 +70,7 @@ def generate(task, llm, n, context=None, path=None, seed=None, only=None):
     """About n new cases spread over the answer combinations by `task.weight`, appended to the task's JSONL.
     Returns (rows, cost).
 
-    `only` limits the combinations, e.g. {"categoria": ["seguridad"]} to reinforce one with few valid cases. Each
+    `only` limits the combinations, e.g. {"expense_type": ["travel"]} to reinforce one with few valid cases. Each
     combination is written as soon as it is done: if the run stops, what was generated stays.
     """
     context, path = context or task.default_context, path or task.train_path

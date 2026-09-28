@@ -1,10 +1,10 @@
 """Negatives for one-question-per-candidate tasks: a request paired with catalog items it does not need.
 
-A task like context prefiltering asks one templated question per candidate ("is «{name}» useful for this request?"),
+A task like picking the tools, documents or products a request needs asks one templated question per candidate ("is «{name}» useful for this request?"),
 with the candidate drawn from `generation.pool`. Every case generated for item X where the answer is yes is paired
 with other items of the pool, labelled no by construction:
 
-    near     the items most similar to X (embeddings): the hard negatives, two database MCPs or two docs skills
+    near     the items most similar to X (embeddings): the hard negatives, two database tools or two docs pages
     random   any other items: the easy negatives, most of what a real catalog holds for a request
 
 Near pairs go to <data>_near.jsonl and through `verify`, since a similar item may be needed too and the judges'

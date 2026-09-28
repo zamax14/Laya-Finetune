@@ -1,7 +1,7 @@
 """A task: the typed questions, how a case becomes Laya's state, what to generate and the hand-written test set.
 
-    task = Task.load("helpdesk")          # tasks/helpdesk.yaml, or any path to a YAML file
-    task.questions["categoria"]           # a questions.Question
+    task = Task.load("invoices")          # tasks/invoices.yaml, or any path to a YAML file
+    task.questions["expense_type"]        # a questions.Question
     task.combos()                         # every answer combination the generator writes texts for
     task.state(case)                      # what Laya reads for a case
 

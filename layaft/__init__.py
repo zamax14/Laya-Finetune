@@ -2,13 +2,13 @@
 
     from layaft import LayaFT
     m = LayaFT("multilingual")                                  # or "english", a Hub repo, a local checkpoint
-    m.generate(task="helpdesk", backend="ollama", n=216)        # synthetic cases labelled by construction
-    m.verify(task="helpdesk", llm="gemma4:31b")                 # a second LLM drops the mislabelled ones
-    m.train(task="helpdesk", ctx="16k", profile="full")          # RLCD + calibration → runs/helpdesk-16k
-    m.val(task="helpdesk")
-    m.predict({"ticket": "The VPN drops every hour"}, task="helpdesk")
+    m.generate(task="invoices", backend="ollama", n=216)        # synthetic cases labelled by construction
+    m.verify(task="invoices", llm="gemma4:31b")                 # a second LLM drops the mislabelled ones
+    m.train(task="invoices", ctx="16k", profile="full")          # RLCD + calibration → runs/invoices-16k
+    m.val(task="invoices")
+    m.predict({"invoice": "Iberia: flight MAD-MEX on 12 May"}, task="invoices")
 
-The same modes from the shell: `layaft train task=helpdesk ctx=16k profile=full`.
+The same modes from the shell: `layaft train task=invoices ctx=16k profile=full`.
 """
 from layaft import config  # First: sets HF_HOME and TORCH_DISABLE_NATIVE_JIT before torch is imported.
 from layaft.model.context import parse_ctx

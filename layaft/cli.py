@@ -1,12 +1,12 @@
 """`layaft <mode> key=value ...`, like `yolo train data=coco.yaml`.
 
-    layaft generate task=helpdesk backend=openrouter n=216 context=all
-    layaft generate task=helpdesk backend=ollama llm=gemma3:12b filler=200
-    layaft verify task=helpdesk llm=gemma4:31b
-    layaft pair task=context_prefilter near=3 random=4
-    layaft train task=helpdesk ctx=16k profile=full
-    layaft val task=helpdesk model=runs/helpdesk-16k ctx=16k
-    layaft predict task=helpdesk model=runs/helpdesk-16k state="La VPN se cae cada hora"
+    layaft generate task=invoices backend=openrouter n=216 context=all
+    layaft generate task=invoices backend=ollama llm=gemma3:12b filler=200
+    layaft verify task=invoices llm=gemma4:31b
+    layaft pair task=catalog near=3 random=4
+    layaft train task=invoices ctx=16k profile=full
+    layaft val task=invoices model=runs/invoices-16k ctx=16k
+    layaft predict task=invoices model=runs/invoices-16k state="Iberia: flight MAD-MEX on 12 May, seat 23C"
     layaft extend model=multilingual ctx=32k
 
 `model=` picks the checkpoint (multilingual by default); every other key goes to the mode.
