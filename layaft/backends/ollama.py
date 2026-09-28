@@ -15,6 +15,11 @@ class Ollama(LLM):
         if model not in available:
             raise ValueError(f"Ollama has no model {model!r}; available: {', '.join(available)}")
 
+    def embed(self, texts):
+        """Vectors for `texts` with an embedding model of the server (e.g. bge-m3), 64 at a time."""
+        texts = list(texts)
+        return [v for i in range(0, len(texts), 64) for v in self.client.embed(model=self.model, input=texts[i:i + 64]).embeddings]
+
     def __call__(self, prompt, schema):
         reply = self.client.chat(model=self.model, messages=[{"role": "user", "content": prompt}], format=schema,
                                  think=False, options={"temperature": self.temperature})

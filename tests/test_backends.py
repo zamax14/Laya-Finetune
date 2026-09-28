@@ -57,6 +57,15 @@ class BackendChecks(unittest.TestCase):
         self.assertEqual(client.chat.call_args.kwargs["format"], {"type": "object"})
         self.assertFalse(client.chat.call_args.kwargs["think"])
 
+    def test_ollama_embed_in_batches_of_64(self):
+        with mock.patch("layaft.backends.ollama.Client") as client_cls:
+            client = client_cls.return_value
+            client.list.return_value.models = [mock.Mock(model="bge-m3:latest")]
+            client.embed.side_effect = lambda model, input: mock.Mock(embeddings=[[len(t)] for t in input])
+            vectors = create_backend("ollama", model="bge-m3:latest").embed(["ab"] * 100)
+        self.assertEqual(vectors, [[2]] * 100)
+        self.assertEqual([len(c.kwargs["input"]) for c in client.embed.call_args_list], [64, 36])
+
     def test_fallback_switches_only_when_out_of_credit(self):
         chain = FallbackChain([Fake("HTTP 402: Insufficient credits"), Fake()])
         self.assertEqual(chain("x", {}), ('{"items": []}', 0.0))

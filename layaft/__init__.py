@@ -60,6 +60,15 @@ class LayaFT:
         kept, relabelled, _ = verify(_task(task), judge, data and Path(data))
         return len(kept) + len(relabelled)
 
+    def pair(self, task, near=3, random=4, embed="bge-m3:latest", data=None, ollama_url=None, seed=0):
+        """For a task with one templated question per pool item: pairs every positive case with the `near` most
+        similar items (to verify) and `random` others, both labelled no. Returns (near, random) counts."""
+        from pathlib import Path
+        from layaft.backends.ollama import Ollama
+        from layaft.data.pairs import pair
+        near_rows, random_rows = pair(_task(task), Ollama(embed, ollama_url).embed, near, random, data and Path(data), seed)
+        return len(near_rows), len(random_rows)
+
     def train(self, task, ctx=None, profile="test", epochs=None, teacher="jev", data=None, out=None, gpu_limit=None,
               long=600):
         """RLCD fine-tune; ctx above the checkpoint's positions extends it with YaRN first. Returns the checkpoint."""
