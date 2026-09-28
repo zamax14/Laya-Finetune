@@ -43,6 +43,14 @@ class PairChecks(unittest.TestCase):
             self.assertEqual(len(io.read(outputs(task.train_path)[0])), 1)
             self.assertEqual(pair(task, embed, near=1, random_=2, seed=0), ([], []))  # Already paired.
 
+    def test_pool_can_be_swapped_for_the_held_out_catalog(self):
+        from layaft import _task
+        with tempfile.TemporaryDirectory() as tmp:
+            task = make_task(tmp)
+            self.assertEqual(len(task.pool_rows), 4)
+            io.append(Path(tmp) / "heldout.jsonl", ITEMS[:1])
+            self.assertEqual(_task(task, Path(tmp) / "heldout.jsonl").pool_rows, ITEMS[:1])
+
 
 if __name__ == "__main__":
     unittest.main()

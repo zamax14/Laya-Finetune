@@ -17,8 +17,14 @@ from layaft.task import Task
 __all__ = ["LayaFT", "Task"]
 
 
-def _task(task):
-    return task if isinstance(task, Task) else Task.load(task)
+def _task(task, pool=None):
+    """The task; `pool` swaps its generation pool, e.g. for the held-out catalog."""
+    task = task if isinstance(task, Task) else Task.load(task)
+    if pool:
+        from pathlib import Path
+        task.pool_path = Path(pool)
+        task.__dict__.pop("pool_rows", None)
+    return task
 
 
 def _ctx(ctx):
@@ -32,17 +38,19 @@ class LayaFT:
         self.model = str(model)
 
     def generate(self, task, backend="ollama", n=72, context=None, filler=0, llm=None, api_key=None, base_url=None,
-                 ollama_url=None, parallel=None, only=None, seed=None):
+                 ollama_url=None, parallel=None, only=None, seed=None, pool=None, out=None):
         """About `n` cases per context; `context="all"` walks the task's contexts file. `filler=N` also writes N
-        neutral documents (spread over the contexts) for long-context training."""
+        neutral documents (spread over the contexts) for long-context training. `pool` and `out` swap the task's
+        generation pool and output file, e.g. to write a held-out test from items never trained on."""
+        from pathlib import Path
         from layaft.backends import create_backend
         from layaft.data.generate import generate, generate_filler
-        task = _task(task)
+        task = _task(task, pool)
         llm_ = create_backend(backend, llm, api_key, base_url, ollama_url, parallel)
         contexts = task.contexts() if context == "all" else [context or task.default_context]
         total, cost = 0, 0.0
         for i, ctx in enumerate(contexts, 1):
-            rows, spent = generate(task, llm_, n, ctx, seed=seed, only=only) if n else ([], 0.0)
+            rows, spent = generate(task, llm_, n, ctx, out and Path(out), seed=seed, only=only) if n else ([], 0.0)
             docs, spent_filler = generate_filler(task, llm_, -(-filler // len(contexts)), ctx) if filler else ([], 0.0)
             total, cost = total + len(rows), cost + spent + spent_filler
             print(f"[{i}/{len(contexts)}] {len(rows)} cases and {len(docs)} filler documents · {ctx}", flush=True)
@@ -60,13 +68,14 @@ class LayaFT:
         kept, relabelled, _ = verify(_task(task), judge, data and Path(data))
         return len(kept) + len(relabelled)
 
-    def pair(self, task, near=3, random=4, embed="bge-m3:latest", data=None, ollama_url=None, seed=0):
+    def pair(self, task, near=3, random=4, embed="bge-m3:latest", data=None, ollama_url=None, seed=0, pool=None):
         """For a task with one templated question per pool item: pairs every positive case with the `near` most
         similar items (to verify) and `random` others, both labelled no. Returns (near, random) counts."""
         from pathlib import Path
         from layaft.backends.ollama import Ollama
         from layaft.data.pairs import pair
-        near_rows, random_rows = pair(_task(task), Ollama(embed, ollama_url).embed, near, random, data and Path(data), seed)
+        near_rows, random_rows = pair(_task(task, pool), Ollama(embed, ollama_url).embed, near, random,
+                                      data and Path(data), seed)
         return len(near_rows), len(random_rows)
 
     def train(self, task, ctx=None, profile="test", epochs=None, teacher="jev", data=None, out=None, gpu_limit=None,
@@ -78,15 +87,17 @@ class LayaFT:
                                        data and Path(data), out and Path(out), gpu_limit, long).run())
         return self.model
 
-    def val(self, task, ctx=None, device="cuda", save=True):
-        """The hand-written test set, saved in runs/val/<task>-<model>/; with ctx above 2048 (compose.LONG), also wrapped in filler at 8k/16k/32k/64k up to ctx."""
+    def val(self, task, ctx=None, device="cuda", save=True, test=None):
+        """The hand-written test set, saved in runs/val/<task>-<model>/; with ctx above 2048 (compose.LONG), also wrapped in filler at 8k/16k/32k/64k up to ctx.
+        `test` evaluates another JSONL instead (e.g. real cases kept outside the repository), saved with its name."""
         import json
+        from pathlib import Path
         from layaft.data.compose import LONG
         from layaft.evaluate import report, run
         from layaft.model.load import load
         task, ctx = _task(task), _ctx(ctx)
         agent = load(self.model, device, ctx)
-        cases = task.test_cases()
+        cases = task.read_cases(Path(test), graded=False) if test else task.test_cases()
         summary, rows = run.evaluate(agent, cases, task)
         out = {"model": self.model, "fingerprint": task.fingerprint(cases), "summary": summary, "rows": rows}
         if ctx and ctx > LONG:
@@ -95,8 +106,8 @@ class LayaFT:
         else:
             print(report.table(task, {self.model: summary}))
         if save:
-            from pathlib import Path
-            path = config.RUNS / "val" / f"{task.name}-{Path(self.model).name.split('@')[0]}"
+            path = config.RUNS / "val" / (f"{task.name}-{Path(self.model).name.split('@')[0]}"
+                                          + (f"-{Path(test).stem}" if test else ""))
             path.mkdir(parents=True, exist_ok=True)
             (path / "results.json").write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str))
             report.chart(task, out.get("by_length") or {self.model: summary}, path / "chart.svg",
