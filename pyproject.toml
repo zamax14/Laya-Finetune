@@ -9,6 +9,8 @@ description = "Fine-tune Laya, the open System One decision model, for any typed
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+authors = [{name = "zamax14"}]
+keywords = ["laya", "fine-tuning", "system-one", "rlcd", "calibration", "long-context", "yarn", "synthetic-data"]
 # torch with CUDA: pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130
 dependencies = [
     "laya==0.3.5",
@@ -18,6 +20,10 @@ dependencies = [
     "pydantic>=2.7",
     "pyyaml>=6",
 ]
+
+[project.urls]
+Repository = "https://github.com/zamax14/Laya-Finetune"
+Issues = "https://github.com/zamax14/Laya-Finetune/issues"
 
 [project.scripts]
 layaft = "layaft.cli:main"
