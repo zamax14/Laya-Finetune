@@ -10,6 +10,15 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{name = "zamax14"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 keywords = ["laya", "fine-tuning", "system-one", "rlcd", "calibration", "long-context", "yarn", "synthetic-data"]
 # torch with CUDA: pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130
 dependencies = [
@@ -22,6 +31,7 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/zamax14/Laya-Finetune"
 Repository = "https://github.com/zamax14/Laya-Finetune"
 Issues = "https://github.com/zamax14/Laya-Finetune/issues"
 
