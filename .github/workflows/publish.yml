@@ -1,0 +1,38 @@
+name: publish
+
+# Publishing a GitHub release uploads that version to PyPI, with no stored token: PyPI trusts this workflow
+# (Trusted Publishing), set up once on pypi.org with the `pypi` environment.
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/laya-finetune/
+    permissions:
+      id-token: write  # Trusted Publishing: the job proves to PyPI which workflow it is.
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
