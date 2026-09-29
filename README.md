@@ -1,13 +1,12 @@
 <div align="center">
 
-# Laya Finetune
+<img src="docs/banner.png" alt="LayaFT: fine-tune Laya with a simple CLI and Python API" width="100%">
 
-**Fine-tune Laya, the open System One decision model, for any typed-decision task: synthetic data from any LLM,
-RLCD with a teacher, calibration, and context from 1k up to 64k tokens.**
+**Turn Laya, the open System One decision model, into a specialist for your own task.**
 
-Laya answers typed questions about a state in one forward pass, without generating text, in ~10–30 ms. Out of the
-box it is a generalist; this framework specializes it on your task the way Ultralytics trains YOLO: describe the task
-in a YAML file, then `generate`, `train` and `val` from one command or one function.
+Describe the decisions in a YAML file. Laya Finetune writes the training data with any LLM, filters it with a second
+one, trains with RLCD, calibrates the confidence and grows the context up to 32k tokens. You get a checkpoint that
+answers in a few milliseconds on your own GPU.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-6c4ee3?logo=python&logoColor=white)](#install)
 [![Model: Laya](https://img.shields.io/badge/model-Laya-ffc53d?logo=huggingface&logoColor=black)](https://huggingface.co/convaiinnovations/laya-multilingual)
@@ -15,22 +14,34 @@ in a YAML file, then `generate`, `train` and `val` from one command or one funct
 [![License MIT](https://img.shields.io/badge/license-MIT-2fbf94)](LICENSE)
 [![Tests](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml/badge.svg)](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml)
 
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Results](#results) · [Docs](#a-task-is-a-yaml-file) · [Contributing](CONTRIBUTING.md)
+
 </div>
 
-```bash
-layaft generate task=invoices backend=ollama n=216 context=all     # cases labelled by construction
-layaft verify task=invoices llm=gemma4:31b                         # a second LLM drops the mislabelled ones
-layaft train task=invoices profile=full ctx=16k                    # RLCD + calibration → runs/invoices-16k
-layaft val task=invoices model=runs/invoices-16k ctx=16k           # hand-written test set, by length
-```
+<p align="center">
+  <img src="docs/cli.png" width="49%" alt="Train from the command line: git clone, pip install -e ., then layaft train task=helpdesk model=multilingual profile=full ctx=32k">
+  <img src="docs/python.png" width="49%" alt="Train from Python: from layaft import LayaFT; model = LayaFT(\"multilingual\"); model.train(task=\"helpdesk\", profile=\"full\", ctx=\"32k\")">
+</p>
 
-## Laya and Jev
+## What is Laya?
 
-[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) (TypeSafe, September 2026) opened the category
-of **System One models**. They do not write text: given a state and typed questions (`choice`, `score`, `noul`),
-they return typed answers with calibrated probabilities. They are trained with RLCD (reinforcement learning for
-calibrated decisions) on synthetic data only. [Laya](https://github.com/NandhaKishorM/laya) is its open reproduction
-(Apache-2.0), speaks the same `/v1/systemone` contract and runs on your own GPU.
+Most language models write text. **System One models** make decisions instead. They receive a state (a ticket, an
+email, a JSON document) and a set of typed questions, and they return typed answers with a probability for each
+option, in a single forward pass:
+
+| Question type | Answers | Example |
+|---|---|---|
+| `choice` | one option out of several | Which team should handle this ticket? |
+| `score` | a level on an ordered scale | How urgent is it? |
+| `noul` | yes or no | Is the person blocked from working? |
+
+[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev) (TypeSafe) opened the category.
+[Laya](https://github.com/NandhaKishorM/laya) is its open reproduction: Apache-2.0 weights, the same
+`/v1/systemone` contract, and 322M parameters that run on a laptop GPU.
+
+Out of the box, Laya is a generalist. It is fast, but it misses more often than Jev, its confidence is not
+calibrated and it reads only 1,024 tokens. Fine-tuning on a single task closes most of that gap, and Laya Finetune
+turns it into four commands.
 
 | | Jev 1.13 | Laya multilingual | Laya english |
 |---|---|---|---|
@@ -40,10 +51,56 @@ calibrated decisions) on synthetic data only. [Laya](https://github.com/NandhaKi
 | Cost | US$0.042 / M input tokens | your GPU | your GPU |
 | Weak spots | — | zero-shot, >20 options, raw calibration, short context | English only |
 
-Zero-shot, Laya lags behind; fine-tuned on its task, it catches up at a fraction of the latency. This framework closes the other gap: **context**. It extends the
-encoder with YaRN and trains it on long states, up to 32k tokens tested and 64k experimental.
+## How it works
 
-## Install
+```mermaid
+flowchart LR
+    Y["task.yaml<br/>questions and fields"] --> G["generate<br/>any LLM writes cases<br/>labelled by construction"]
+    G --> V["verify<br/>a second LLM<br/>drops wrong labels"]
+    V --> T["train<br/>RLCD + calibration<br/>1k to 32k context"]
+    T --> E["val<br/>hand-written test set,<br/>never trained on"]
+    E --> C["checkpoint<br/>loads with laya.load()"]
+```
+
+1. **Generate.** The answers are chosen first, and an LLM writes a text that has them. Every case is labelled by
+   construction, so no one has to annotate data by hand. It works with Ollama, OpenRouter, OpenAI or any
+   OpenAI-compatible server.
+2. **Verify.** An LLM from another family answers every case blind. Only the cases where it agrees are kept.
+3. **Train.** Laya learns with RLCD (reinforcement learning for calibrated decisions), optionally guided by Jev as a
+   teacher. One temperature per question type is then fitted, so a 90 % answer is right about 90 % of the time.
+4. **Validate.** The checkpoint is measured on a test set written by hand. Validation on generated data overestimates
+   quality, so the test set is the number that counts.
+
+The result is a regular Laya checkpoint: it loads with the official `laya.load(path)` and serves the same contract.
+
+## Results
+
+Three tasks, each with a test set that was never trained on: Laya multilingual as shipped, and the same model
+fine-tuned with Laya Finetune.
+
+<p align="center"><img src="docs/accuracy.svg" width="820" alt="Test cases with every answer right. IT helpdesk triage: 10% as shipped, 55% fine-tuned. Tool routing: 4% as shipped, 72% fine-tuned. Context prefiltering: 41% as shipped, 90% fine-tuned."></p>
+
+- **IT helpdesk triage.** Category, priority and whether the person is blocked, on 20 hand-written tickets. The
+  category goes from 12 to 17 right out of 19. The blocking question goes from 15 to 19 out of 20, with a Brier score
+  going from 0.178 to 0.042.
+- **Tool routing.** Answer, ask or act, and which of five tools to call, on 120 hand-written requests. The action alone
+  goes from 24 to 101 right out of 119.
+- **Context prefiltering.** Whether a tool or skill is useful for a request, on 3,120 pairs built from a catalog kept
+  out of training. Only 16 % of the pairs are useful, so always answering "no" would already score 84 %. The F1 score
+  for "useful" says more: it goes from 0.27 to 0.66.
+
+A fine-tuned Laya keeps the speed of the base model. On the helpdesk tickets it matches Jev on category and
+blocking, and it answers in about a tenth of the time:
+
+<p align="center"><img src="docs/latency.svg" width="820" alt="Median time per decision: Laya fine-tuned 32 ms on a local RTX 4050 laptop GPU, Jev 1.13 305 ms and GPT-5.6 Luna 1,946 ms through the API, network included."></p>
+
+The runs, including the benchmark and the API comparison, are in
+[System One Playground](https://github.com/zamax14/System-One-Playground). The latency of the API models includes the
+network, and $0 of API spend on Laya does not include the cost of the hardware.
+
+## Quick start
+
+### Install
 
 ```bash
 git clone https://github.com/zamax14/Laya-Finetune.git && cd Laya-Finetune
@@ -54,6 +111,32 @@ pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130   # CU
 Or, without cloning: `pip install git+https://github.com/zamax14/Laya-Finetune --extra-index-url https://download.pytorch.org/whl/cu130`.
 
 Generating data needs no GPU. Training and evaluation need an NVIDIA GPU; the `test` profile fits in 3 GB.
+
+### Train your first task
+
+Write a task (next section), then:
+
+```bash
+layaft generate task=invoices backend=ollama n=216 context=all     # cases labelled by construction
+layaft verify task=invoices llm=gemma4:31b                         # a second LLM drops the mislabelled ones
+layaft train task=invoices profile=full ctx=16k                    # RLCD + calibration → runs/invoices-16k
+layaft val task=invoices model=runs/invoices-16k ctx=16k           # hand-written test set, by length
+```
+
+The same from Python:
+
+```python
+from layaft import LayaFT
+
+m = LayaFT("multilingual")
+m.generate(task="invoices", backend="ollama", n=216, context="all")
+m.verify(task="invoices", llm="gemma4:31b")
+m.train(task="invoices", profile="full", ctx="16k")     # m.model is now runs/invoices-16k
+m.val(task="invoices", ctx="16k")
+m.predict({"invoice": "Iberia: flight MAD-MEX on 12 May, seat 23C"}, task="invoices")
+```
+
+Start with `profile=test` (a few minutes, 3 GB of GPU memory) to check the whole loop before a full run.
 
 ## A task is a YAML file
 
@@ -133,17 +216,6 @@ Every mode is a CLI command and a method of `LayaFT`; `model=` picks the checkpo
 `english`, a Hub repo or a local folder).
 
 Each mode has a runnable Python script in [`examples/`](examples) whose docstring shows the equivalent command.
-
-```python
-from layaft import LayaFT
-
-m = LayaFT("multilingual")
-m.generate(task="invoices", backend="openrouter", n=216, context="all")
-m.verify(task="invoices", llm="gemma4:31b")             # → data/invoices_verified.jsonl
-m.train(task="invoices", profile="full", ctx="32k")     # m.model is now runs/invoices-32k
-m.val(task="invoices", ctx="32k")
-m.predict({"invoice": "Iberia: flight MAD-MEX on 12 May, seat 23C"}, task="invoices")
-```
 
 | Mode | What it does | Main arguments |
 |---|---|---|
@@ -298,6 +370,11 @@ tests/       unit tests, on the task in tests/fixtures
 ```bash
 python -m unittest discover -s tests -t .    # no network, no GPU
 ```
+
+## Contributing
+
+Issues and pull requests are welcome: new LLM backends, question types, tasks that break an assumption, or results on
+other GPUs. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup and the conventions.
 
 ## Credits
 
