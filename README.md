@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.png" alt="LayaFT: fine-tune Laya with a simple CLI and Python API" width="100%">
+<img src="https://raw.githubusercontent.com/zamax14/Laya-Finetune/main/docs/banner.png" alt="LayaFT: fine-tune Laya with a simple CLI and Python API" width="100%">
 
 **Turn Laya, the open System One decision model, into a specialist for your own task.**
 
@@ -11,16 +11,16 @@ answers in a few milliseconds on your own GPU.
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-6c4ee3?logo=python&logoColor=white)](#install)
 [![Model: Laya](https://img.shields.io/badge/model-Laya-ffc53d?logo=huggingface&logoColor=black)](https://huggingface.co/convaiinnovations/laya-multilingual)
 [![GPU NVIDIA](https://img.shields.io/badge/GPU-NVIDIA%20·%20CUDA%2013-76b900?logo=nvidia&logoColor=white)](#install)
-[![License MIT](https://img.shields.io/badge/license-MIT-2fbf94)](LICENSE)
+[![License MIT](https://img.shields.io/badge/license-MIT-2fbf94)](https://github.com/zamax14/Laya-Finetune/blob/main/LICENSE)
 [![Tests](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml/badge.svg)](https://github.com/zamax14/Laya-Finetune/actions/workflows/tests.yml)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Results](#results) · [Docs](#a-task-is-a-yaml-file) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Results](#results) · [Docs](#a-task-is-a-yaml-file) · [Contributing](https://github.com/zamax14/Laya-Finetune/blob/main/CONTRIBUTING.md)
 
 </div>
 
 <p align="center">
-  <img src="docs/cli.png" width="49%" alt="Train from the command line: git clone, pip install -e ., then layaft train task=helpdesk model=multilingual profile=full ctx=32k">
-  <img src="docs/python.png" width="49%" alt="Train from Python: from layaft import LayaFT; model = LayaFT(\"multilingual\"); model.train(task=\"helpdesk\", profile=\"full\", ctx=\"32k\")">
+  <img src="https://raw.githubusercontent.com/zamax14/Laya-Finetune/main/docs/cli.png" width="49%" alt="Train from the command line: git clone, pip install -e ., then layaft train task=helpdesk model=multilingual profile=full ctx=32k">
+  <img src="https://raw.githubusercontent.com/zamax14/Laya-Finetune/main/docs/python.png" width="49%" alt="Train from Python: from layaft import LayaFT; model = LayaFT(\"multilingual\"); model.train(task=\"helpdesk\", profile=\"full\", ctx=\"32k\")">
 </p>
 
 ## What is Laya?
@@ -78,7 +78,7 @@ The result is a regular Laya checkpoint: it loads with the official `laya.load(p
 Three tasks, each with a test set that was never trained on: Laya multilingual as shipped, and the same model
 fine-tuned with Laya Finetune.
 
-<p align="center"><img src="docs/accuracy.svg" width="820" alt="Test cases with every answer right. IT helpdesk triage: 10% as shipped, 55% fine-tuned. Tool routing: 4% as shipped, 72% fine-tuned. Context prefiltering: 41% as shipped, 90% fine-tuned."></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zamax14/Laya-Finetune/main/docs/accuracy.svg" width="820" alt="Test cases with every answer right. IT helpdesk triage: 10% as shipped, 55% fine-tuned. Tool routing: 4% as shipped, 72% fine-tuned. Context prefiltering: 41% as shipped, 90% fine-tuned."></p>
 
 - **IT helpdesk triage.** Category, priority and whether the person is blocked, on 20 hand-written tickets. The
   category goes from 12 to 17 right out of 19. The blocking question goes from 15 to 19 out of 20, with a Brier score
@@ -92,7 +92,7 @@ fine-tuned with Laya Finetune.
 A fine-tuned Laya keeps the speed of the base model. On the helpdesk tickets it matches Jev on category and
 blocking, and it answers in about a tenth of the time:
 
-<p align="center"><img src="docs/latency.svg" width="820" alt="Median time per decision: Laya fine-tuned 32 ms on a local RTX 4050 laptop GPU, Jev 1.13 305 ms and GPT-5.6 Luna 1,946 ms through the API, network included."></p>
+<p align="center"><img src="https://raw.githubusercontent.com/zamax14/Laya-Finetune/main/docs/latency.svg" width="820" alt="Median time per decision: Laya fine-tuned 32 ms on a local RTX 4050 laptop GPU, Jev 1.13 305 ms and GPT-5.6 Luna 1,946 ms through the API, network included."></p>
 
 The runs, including the benchmark and the API comparison, are in
 [System One Playground](https://github.com/zamax14/System-One-Playground). The latency of the API models includes the
@@ -103,12 +103,16 @@ network, and $0 of API spend on Laya does not include the cost of the hardware.
 ### Install
 
 ```bash
-git clone https://github.com/zamax14/Laya-Finetune.git && cd Laya-Finetune
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130   # CUDA 13, driver ≥ 580
+pip install laya-finetune --extra-index-url https://download.pytorch.org/whl/cu130   # CUDA 13, driver ≥ 580
 ```
 
-Or, without cloning: `pip install git+https://github.com/zamax14/Laya-Finetune --extra-index-url https://download.pytorch.org/whl/cu130`.
+The extra index picks the CUDA 13 build of torch; drop it to keep the torch you already have. To work on the code:
+
+```bash
+git clone https://github.com/zamax14/Laya-Finetune.git && cd Laya-Finetune
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e . --extra-index-url https://download.pytorch.org/whl/cu130
+```
 
 Generating data needs no GPU. Training and evaluation need an NVIDIA GPU; the `test` profile fits in 3 GB.
 
@@ -160,7 +164,7 @@ data: {test: invoices_test.jsonl}                     # hand-written cases, neve
 ```
 
 Save it as `tasks/invoices.yaml` in your working directory and `task=invoices` finds it; any other path works too.
-A complete task with most options is the one the tests run on, [`tests/fixtures/helpdesk.yaml`](tests/fixtures/helpdesk.yaml).
+A complete task with most options is the one the tests run on, [`tests/fixtures/helpdesk.yaml`](https://github.com/zamax14/Laya-Finetune/blob/main/tests/fixtures/helpdesk.yaml).
 Beyond the basics, a task can declare:
 - the traffic light on confidence (`review`), per-option `signals` and `leak_phrases`;
 - a custom `prompt` in Spanish and a contexts file;
@@ -215,7 +219,7 @@ line by line when it is read, and an error names the file, the line and the fiel
 Every mode is a CLI command and a method of `LayaFT`; `model=` picks the checkpoint (`multilingual` by default,
 `english`, a Hub repo or a local folder).
 
-Each mode has a runnable Python script in [`examples/`](examples) whose docstring shows the equivalent command.
+Each mode has a runnable Python script in [`examples/`](https://github.com/zamax14/Laya-Finetune/tree/main/examples) whose docstring shows the equivalent command.
 
 | Mode | What it does | Main arguments |
 |---|---|---|
@@ -347,10 +351,10 @@ python -m unittest discover -s tests -t .    # no network, no GPU
 ## Contributing
 
 Issues and pull requests are welcome: new LLM backends, question types, tasks that break an assumption, or results on
-other GPUs. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup and the conventions.
+other GPUs. See [CONTRIBUTING.md](https://github.com/zamax14/Laya-Finetune/blob/main/CONTRIBUTING.md) for the setup and the conventions.
 
 ## Credits
 
 - **[Laya](https://github.com/NandhaKishorM/laya)** by ConvAI Innovations, Apache-2.0, and its fine-tuning recipe.
 - **Jev** by TypeSafe, **GPT** by OpenAI, through [OpenRouter](https://openrouter.ai).
-- Code under the [MIT](LICENSE) license.
+- Code under the [MIT](https://github.com/zamax14/Laya-Finetune/blob/main/LICENSE) license.
