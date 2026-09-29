@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laya-finetune"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fine-tune Laya, the open System One decision model, for any typed-decision task: synthetic data, RLCD, calibration and long context."
 readme = "README.md"
 license = "MIT"
