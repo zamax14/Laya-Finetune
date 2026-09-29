@@ -108,9 +108,16 @@ class TrainPipeline:
         if graded:
             print(f"The teacher agrees with the constructed label in {sum(c in kept for c in graded)}/{len(graded)} cases; "
                   "the rest are dropped.")
-        random.Random(self.seed).shuffle(kept)
+        groups = {}  # Cases that share a `group` (a translation and its original, say) land on the same side.
+        for case in kept:
+            groups.setdefault(case.get("group", case["id"]), []).append(case)
+        order = list(groups.values())
+        random.Random(self.seed).shuffle(order)
         n_train, n_calib = int(SPLIT[0] * len(kept)), int(SPLIT[1] * len(kept))
-        return kept[:n_train], kept[n_train:n_train + n_calib], kept[n_train + n_calib:]
+        out = ([], [], [])
+        for group in order:
+            out[0 if len(out[0]) < n_train else 1 if len(out[1]) < n_calib else 2].extend(group)
+        return out
 
     def agrees(self, case, teacher):
         t = teacher.get(case["id"])

@@ -273,7 +273,8 @@ only new cases are paid. With `teacher=none` the label is smoothed to 90 %.
 It follows the recipe of [Laya's official notebook](https://github.com/NandhaKishorM/laya/blob/main/notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb)
 on one GPU. **RLCD** draws 4 noisy versions of each distribution and rewards them with proper scoring rules (log,
 spherical, and RPS for `score`), plus a soft cross-entropy term. Cases are split 80 / 10 / 10 into train, calibration
-and validation; the best epoch on validation is kept; one temperature per question type is fitted on the calibration
+and validation (cases with the same `group` key, such as a case and its translation, stay on one side); the best
+epoch on validation is kept; one temperature per question type is fitted on the calibration
 cases. The checkpoint loads with the official `laya.load(path)`.
 
 | Profile | Cases | Epochs | Trains | GPU |

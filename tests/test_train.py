@@ -65,6 +65,14 @@ class TrainChecks(unittest.TestCase):
             self.assertEqual(len(train) + len(calib) + len(val), 9)
             self.assertEqual((len(train), len(calib)), (7, 0))
 
+    def test_split_keeps_each_group_on_one_side(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = fake_pipeline(tmp)
+            cases = [{**case(i), "group": str(i // 2)} for i in range(40)]  # A case and its translation.
+            sides = [{c["group"] for c in side} for side in p.split(cases, {})]
+            self.assertEqual(sum(map(len, sides)), 20)
+            self.assertFalse(sides[0] & sides[1] or sides[0] & sides[2] or sides[1] & sides[2])
+
     def test_test_profile_caps_cases_per_combination_and_runs_do_not_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = fake_pipeline(tmp)
