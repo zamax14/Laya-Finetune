@@ -241,7 +241,8 @@ fields become a Pydantic model whose JSON Schema constrains the LLM and validate
 | `openai` | `llm=gpt-6-luna` | `OPENAI_API_KEY` or file `OPENAI` |
 | `custom` | any OpenAI-compatible server (vLLM, LM Studio, Groq…): `base_url=`, `llm=` | `api_key=` if it needs one |
 
-`api_key=` always wins over the environment and the files, which are git-ignored.
+`api_key=` always wins over the environment and the files, which are git-ignored. Generation never pulls models
+into a shared Ollama server: if `llm=` is not there, it stops and lists the available ones.
 
 ### Judge
 
@@ -295,7 +296,7 @@ positions up to 8,192. The framework grows the context in three steps:
 Above 8k the encoder switches from `sdpa` to `flex_attention` (or `flash_attention_2` if installed): `sdpa` builds a
 dense mask for the sliding-window layers and ran out of memory at 16k on a 6 GB GPU. `flex_attention` is compiled by
 Triton, which needs the Python headers (`Python.h`, from Python's include directory or `CPATH`); without them it stays on
-`sdpa`. [`slurm/train_32k.sh`](slurm/train_32k.sh) unpacks them inside the venv on a node that lacks them.
+`sdpa`.
 
 | Stage | How | Inference measured on an RTX 4050 Laptop (6 GB), 3 questions |
 |---|---|---|
@@ -308,33 +309,6 @@ Triton, which needs the Python headers (`Python.h`, from Python's include direct
 Every long stage can start from the short fine-tuned checkpoint, because it trains on the short cases plus long copies
 of every length up to `ctx`. So the stages run in parallel, one GPU each:
 `layaft train task=invoices model=runs/invoices-1k ctx=16k profile=full`.
-
-## On a Slurm cluster
-
-[`slurm/`](slurm) has one job per step, and each training stage is its own job that also evaluates its checkpoint.
-Every job creates the project's virtual environment, installs the package in it, and runs the step, with the CLI or
-the same calls from Python (commented out, same result). Nothing is installed outside `.venv`.
-
-| Job | Step | GPU |
-|---|---|---|
-| `generate.sh` | cases and filler from the node's Ollama daemon | none from Slurm (the daemon has its own) |
-| `verify.sh` | two judges, then `data/<task>_train.jsonl` | none from Slurm |
-| `train_1k.sh`, `train_8k.sh`, `train_32k.sh` | one context stage (8k and 32k both start from 1k, in parallel), plus its `val` | 1 |
-| `val.sh` | Laya as shipped, the reference | 1 |
-
-[`slurm/pipeline.sh`](slurm/pipeline.sh) queues them all at once with `--dependency=afterok`: each job starts when
-the one it needs has finished well, and independent ones run at the same time on other GPUs. Every step keeps its own
-log in `logs/`, and a failed stage stops the ones after it. Run it on the login node, from the repo root:
-
-```bash
-TASK=invoices bash slurm/pipeline.sh     # or one step: sbatch --export=ALL,TASK=invoices slurm/train_8k.sh
-```
-
-Uncomment `--partition` in each job for your cluster. The Ollama models are variables at the top of `generate.sh`
-(`LLM`) and `verify.sh` (`JUDGE`, `SECOND_JUDGE`), and can be passed the same way as `TASK`.
-
-Generation never pulls models into a shared Ollama server: if `llm=` is not there, it stops and lists the available
-ones.
 
 ## Tips
 
@@ -363,7 +337,6 @@ layaft/
   evaluate/                    metrics per question type and by length, table and chart
   cli.py  __init__.py          `layaft <mode> key=value` and the LayaFT facade
 examples/    one Python script per mode, with its CLI equivalent
-slurm/       one Slurm job per mode
 tests/       unit tests, on the task in tests/fixtures
 ```
 

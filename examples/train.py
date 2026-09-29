@@ -1,7 +1,6 @@
 """Fine-tune Laya multilingual on a task's verified cases, then grow its context to 8k and to 32k, and evaluate each.
 
-8k and 32k both start from the 1k checkpoint: on a cluster they run in parallel (slurm/train_8k.sh, train_32k.sh);
-here, one after the other.
+8k and 32k both start from the 1k checkpoint, so with two GPUs they can run in parallel; here, one after the other.
 Same as the CLI:
     layaft train task=invoices model=multilingual profile=full teacher=none data=data/invoices_train.jsonl out=runs/invoices-1k
     layaft train task=invoices model=runs/invoices-1k profile=full teacher=none data=data/invoices_train.jsonl ctx=8k long=2000 out=runs/invoices-8k
